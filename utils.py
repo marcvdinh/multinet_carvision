@@ -74,6 +74,8 @@ def get_classes(classes_path):
 
 
 def get_random_data(image,
+                    lane_label,
+                    drive_label,
                     xmins,
                     xmaxs,
                     ymins,
@@ -122,7 +124,12 @@ def get_random_data(image,
         image = tf.image.resize(image,
                                 [tf.cast(nh, tf.int32),
                                  tf.cast(nw, tf.int32)])
-
+        lane_label = tf.image.resize(lane_label,
+                                [tf.cast(nh, tf.int32),
+                                 tf.cast(nw, tf.int32)])
+        drive_label = tf.image.resize(drive_label,
+                                [tf.cast(nh, tf.int32),
+                                 tf.cast(nw, tf.int32)])
         def crop_and_pad(image, dx, dy):
             dy = tf.cast(tf.math.maximum(-dy, 0), tf.int32)
             dx = tf.cast(tf.math.maximum(-dx, 0), tf.int32)
@@ -145,16 +152,33 @@ def get_random_data(image,
                                      tf.float32) * (128 / 255)
         image = image_color_padded + new_image
 
+        new_lane_label = tf.cond(
+            tf.greater(scale,
+                       1), lambda: crop_and_pad(lane_label, dx, dy), lambda: tf.image
+            .pad_to_bounding_box(lane_label, tf.cast(tf.math.maximum(
+                dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
+                                 tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
+        lane_label = new_lane_label
+
+        new_drive_label = tf.cond(
+            tf.greater(scale,
+                       1), lambda: crop_and_pad(drive_label, dx, dy), lambda: tf.image
+            .pad_to_bounding_box(drive_label, tf.cast(tf.math.maximum(
+                dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
+                                 tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
+        drive_label = new_drive_label
+
+
         xmins = xmins * nw / iw + dx
         xmaxs = xmaxs * nw / iw + dx
         ymins = ymins * nh / ih + dy
         ymaxs = ymaxs * nh / ih + dy
         if flip:
-            image, xmins, xmaxs = tf.cond(
+            image,lane_label, drive_label, xmins, xmaxs = tf.cond(
                 tf.less(
                     tf.random.uniform([]),
-                    0.5), lambda: (tf.image.flip_left_right(image), w - xmaxs, w
-                                   - xmins), lambda: (image, xmins, xmaxs))
+                    0.5), lambda: (tf.image.flip_left_right(image),tf.image.flip_left_right(lane_label), tf.image.flip_left_right(drive_label), w - xmaxs, w
+                                   - xmins), lambda: (image,lane_label, drive_label, xmins, xmaxs))
         if hue > 0:
             image = tf.image.random_hue(image, hue)
         if sat > 1:
@@ -208,7 +232,7 @@ def get_random_data(image,
     bbox = tf.cond(tf.greater(
         tf.shape(bbox)[0], max_boxes), lambda: bbox[:max_boxes], lambda: bbox)
 
-    return image, bbox
+    return image,lane_label, drive_label, bbox
 
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     '''Preprocess true boxes to training input format

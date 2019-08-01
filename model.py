@@ -8,14 +8,14 @@ from override import mobilenet_v2
 
 
 class CarNet:
-    def __init__(self,shape, n_class,n_anchors, n_lane_embedding, n_drive_embedding):
+    def __init__(self,shape, n_class,n_anchors, n_lane_embedding, n_drive_embedding, alpha):
         self.shape = shape
         self.n_class = n_class
         self.n_anchors = n_anchors
         self.n_lane_embedding = n_lane_embedding
         self.n_drive_embedding = n_drive_embedding
         self._net_intermediate_results = collections.OrderedDict()
-
+        self._alpha = alpha
     
     def MobilenetSeparableConv2D(self,filters,
                                 kernel_size,
@@ -139,6 +139,7 @@ class CarNet:
                 # skip conn
                 x_lo = tf.keras.layers.Conv2D(n_seg_class, (1, 1), padding='same')(residual)
 
+                
                 # merge up and mid
                 x_up_mid_merged = tf.keras.layers.Multiply()([x_up, x_mid])
                 x_up_mid_merged = tf.keras.layers.UpSampling2D(size=2)(x_up_mid_merged)
@@ -150,7 +151,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    x_final = tf.keras.layers.UpSampling2D(size=16)(x_final)
+                    x_final = tf.keras.layers.UpSampling2D(size=8)(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
@@ -193,7 +194,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    x_final = tf.keras.layers.UpSampling2D(size=16)(x_final)
+                    x_final = tf.keras.layers.UpSampling2D(size=8)(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
@@ -334,25 +335,31 @@ class CarNet:
 
         return  [y1,y2]
 
-    def build(self,inputs=None):
+    def build(self,inputs=None, freeze_layers=None):
         if inputs is None:
             inputs = tf.keras.layers.Input(shape=self.shape)
 
-        encoder = self.build_encoder(inputs)
+        encoder = self.build_encoder(inputs, alpha=self._alpha)
         encoder_output = encoder.output
-        segmentation_head =encoder.get_layer('block_16_project_BN').output
+        
         residual_block12 = encoder.get_layer('block_12_project_BN').output
         residual_block5 = encoder.get_layer('block_5_project_BN').output
-        
+        segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 5
         #print(segmentation_head.get_shape().as_list)
-        lane_seg_decoder = self.build_lane_detection(segmentation_head, residual_block12)
-        drive_seg_decoder =  self.build_drivable_detection(segmentation_head, residual_block12) 
-        yolo_decoder = self.build_yolo_body(  encoder_output, residual_block5, residual_block12,self.n_anchors, self.n_class)
+        lane_seg_decoder = self.build_lane_detection(segmentation_head, residual_block5, alpha=self._alpha)
+        drive_seg_decoder =  self.build_drivable_detection(segmentation_head, residual_block5, alpha=self._alpha) 
+        yolo_decoder = self.build_yolo_body(  encoder_output, residual_block5, residual_block12,self.n_anchors, self.n_class, alpha=self._alpha)
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
          
-        #model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
+        #model = tf.keras.Model(inputs, encoder.output)
         model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
-
+        
+        # Freeze the encoder.
+        freeze_layers = min(freeze_layers, 155)
+        for i in range(freeze_layers):
+            encoder.layers[i].trainable = False
+        print('Freeze the first {} layers of total {} layers.'.format(
+            freeze_layers, len(encoder.layers)))
         return model
         
 
@@ -362,8 +369,8 @@ if __name__ == '__main__':
     test code
     """
     test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')
-    model = CarNet(shape=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=4)
-    ret = model.build(inputs=test_in_tensor)
+    model = CarNet(shape=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=4, alpha=1.4)
+    ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
         ret,
         to_file='model.png',
