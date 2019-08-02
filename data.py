@@ -1,7 +1,7 @@
 import tensorflow as tf
 from functools import reduce
-from yolo3.utils import get_random_data,preprocess_true_boxes
-from yolo3.enum import DATASET_MODE
+from tools.utils import get_random_data,preprocess_true_boxes
+from tools.enum import DATASET_MODE
 from random import random
 import tensorflow_datasets as tfds
 import math
@@ -19,6 +19,8 @@ class Dataset(tf.keras.callbacks.Callback):
     def parse_tfrecord(self, example_proto):
         feature_description = {
             'image/encoded': tf.io.FixedLenFeature([], tf.string),
+            'image/lane': tf.io.FixedLenFeature([], tf.string),
+            'image/drive': tf.io.FixedLenFeature([], tf.string),
             'image/object/bbox/xmin': tf.io.VarLenFeature(tf.float32),
             'image/object/bbox/xmax': tf.io.VarLenFeature(tf.float32),
             'image/object/bbox/ymin': tf.io.VarLenFeature(tf.float32),
@@ -31,12 +33,22 @@ class Dataset(tf.keras.callbacks.Callback):
                                       channels=3,
                                       dtype=tf.float32)
         image.set_shape([None, None, 3])
+        lane = tf.image.decode_image(features['image/lane'],
+                                      channels=3,
+                                      dtype=tf.float32)
+        lane.set_shape([None, None, 3])
+        drive = tf.image.decode_image(features['image/drive'],
+                                      channels=3,
+                                      dtype=tf.float32)
+        drive.set_shape([None, None, 3])
         xmins = features['image/object/bbox/xmin'].values
         xmaxs = features['image/object/bbox/xmax'].values
         ymins = features['image/object/bbox/ymin'].values
         ymaxs = features['image/object/bbox/ymax'].values
         labels = features['image/object/bbox/label'].values
         image, bbox = get_random_data(image,
+                                      lane,
+                                      drive,
                                       xmins,
                                       xmaxs,
                                       ymins,
@@ -52,7 +64,7 @@ class Dataset(tf.keras.callbacks.Callback):
         y2.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
         y3.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
 
-        return image, (y1, y2, y3)
+        return image,lane, drive, (y1, y2, y3)
 
     def parse_text(self, line):
         values = tf.strings.split([line],' ').values
@@ -134,7 +146,7 @@ class Dataset(tf.keras.callbacks.Callback):
         self.mode = mode
 
     def _get_num_from_name(self, name):
-        return int(name.split('/')[-1].split('.')[0].split('_')[-1])
+        return int(name.split('/')[-1].split('.')[0].split('_')[-3])
 
     def build(self,split=None):
         if self.glob_path in tfds.list_builders():

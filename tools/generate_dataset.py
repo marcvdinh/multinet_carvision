@@ -4,12 +4,33 @@ import json
 import cv2
 from object_detection.utils import dataset_util
 import contextlib2
-from object_detection.dataset_tools import tf_record_creation_util
 import numpy as np
 import bezier
 flags = tf.app.flags
-flags.DEFINE_string('output_path', '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/bbox/train_dataset.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path', '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/bbox/toy_eval_dataset.record', 'Path to output TFRecord')
 FLAGS = flags.FLAGS
+
+def open_sharded_output_tfrecords(exit_stack, base_path, num_shards):
+  """Opens all TFRecord shards for writing and adds them to an exit stack.
+  Args:
+    exit_stack: A context2.ExitStack used to automatically closed the TFRecords
+      opened in this function.
+    base_path: The base path for all shards
+    num_shards: The number of shards
+  Returns:
+    The list of opened TFRecords. Position k in the list corresponds to shard k.
+  """
+  tf_record_output_filenames = [
+      '{}_{:05d}_of_{:05d}.tfrecords'.format(base_path, idx+1, num_shards)
+      for idx in range(num_shards)
+  ]
+
+  tfrecords = [
+      exit_stack.enter_context(tf.io.TFRecordWriter(file_name))
+      for file_name in tf_record_output_filenames
+  ]
+
+  return tfrecords
 
 
 def create_tf_example(src_dir,img):
@@ -35,8 +56,6 @@ def create_tf_example(src_dir,img):
     assert ops.exists(drive_path), '{:s} not exist'.format(drive_path)
     labels = img['labels']
     lanes = [label for label in labels if label['category']=='lane']
-    
-    #drivable_areas = [label for label in labels if label['category']=='drivable area']
     image_name_new = '{:s}.png'.format('{:s}'.format(image_name).zfill(4))
     src_image = cv2.imread(image_path, cv2.IMREAD_COLOR)
     drive_image = cv2.imread(drive_path, cv2.IMREAD_COLOR )
@@ -51,11 +70,11 @@ def create_tf_example(src_dir,img):
             handle_pts = lane['poly2d'][0]['vertices']
             handle_pts = np.transpose(handle_pts)
             nodes = np.asfortranarray(handle_pts)
-            #print(nodes)
             curve = bezier.Curve.from_nodes(nodes)
             s_vals = np.linspace(0.0, 1.0, 15)
             lane_pts = curve.evaluate_multi(s_vals)
             lane_pts = np.transpose(lane_pts)  
+            #binary lane map
             #cv2.polylines(dst_binary_image, np.int32([lane_pts]), isClosed=False,
             #                  color=255, thickness=5)        
             if lane['attributes']['laneType'] == 'road curb':
@@ -81,19 +100,16 @@ def create_tf_example(src_dir,img):
     encoded_image_data = cv2.imencode('.jpg', src_image)[1].tostring() # Encoded image bytes
     encoded_lane_label = cv2.imencode('.jpg', lane_image)[1].tostring()
     encoded_drive_label = cv2.imencode('.jpg', drive_image)[1].tostring()
-    image_format = b'jpg' # b'jpeg' or b'png'
-    
-    
-
-    traffic_signs =  [label for label in labels if label['category']=='traffic sign']
-    traffic_lights = [label for label in labels if label['category']=='traffic light']
-    cars = traffic_signs =  [label for label in labels if label['category']=='car']
-    riders = [label for label in labels if label['category']=='rider']
-    motors = [label for label in labels if label['category']=='motor']
-    bikes = [label for label in labels if label['category']=='bike']
-    buses = [label for label in labels if label['category']=='bus']
-    trucks = [label for label in labels if label['category']=='truck']
-    persons = [label for label in labels if label['category']=='person']
+    image_format = b'jpg' # b'jpeg' or b'png'   
+    traffic_signs = [label for label in labels if label['category'] =='traffic sign']
+    traffic_lights = [label for label in labels if label['category'] =='traffic light']
+    cars = traffic_signs = [label for label in labels if label['category'] =='car']
+    riders = [label for label in labels if label['category'] =='rider']
+    motors = [label for label in labels if label['category'] =='motor']
+    bikes = [label for label in labels if label['category'] =='bike']
+    buses = [label for label in labels if label['category'] =='bus']
+    trucks = [label for label in labels if label['category'] =='truck']
+    persons = [label for label in labels if label['category'] =='person']
 
     for traffic_sign_index, traffic_sign in enumerate(traffic_signs):
         xmins.append(traffic_sign["box2d"]["x1"]/1280.0)
@@ -194,7 +210,8 @@ def create_tf_example(src_dir,img):
         if traffic_light["attributes"]["trafficLightColor"] == "none":
             classes_text.append(b"traffic lig: none")
             classes.append(5)  
-    #print(classes, len(classes)) 
+    #write tfrecord
+    
     tf_example = tf.train.Example(features=tf.train.Features(feature={
     'image/height': dataset_util.int64_feature(height),
     'image/width': dataset_util.int64_feature(width),
@@ -214,25 +231,25 @@ def create_tf_example(src_dir,img):
     return tf_example
 
 
-#def main(_):
-#    json_file_path = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/labels/toy_labels_train.json'
-#    src_dir = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/'
-#    num_shards=1
-#    output_filebase='/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/bbox/toy_train/eval_dataset.tfrecord'
-  # TODO(user): Write code to read in your dataset to examples variable
-#    with contextlib2.ExitStack() as tf_record_close_stack:
-#        output_tfrecords = tf_record_creation_util.open_sharded_output_tfrecords(
-#        tf_record_close_stack, output_filebase, num_shards)
-#        with open(json_file_path, 'r') as file:
-#            info_dict = json.load(file)
-#            for index, img in enumerate(info_dict):
-#                tf_example = create_tf_example(src_dir,img)
-#                output_shard_index = index % num_shards
-#                output_tfrecords[output_shard_index].write(tf_example.SerializeToString())
-
 def main(_):
+    json_file_path = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/labels/toy_labels_eval.json'
+    src_dir = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/'
+    num_shards=10
+    output_filebase='/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/multinet_carvision/data/eval/eval_dataset'
+  # TODO(user): Write code to read in your dataset to examples variable
+    with contextlib2.ExitStack() as tf_record_close_stack:
+        output_tfrecords = open_sharded_output_tfrecords(
+        tf_record_close_stack, output_filebase, num_shards)
+        with open(json_file_path, 'r') as file:
+            info_dict = json.load(file)
+            for index, img in enumerate(info_dict):
+                tf_example = create_tf_example(src_dir,img)
+                output_shard_index = index % num_shards
+                output_tfrecords[output_shard_index].write(tf_example.SerializeToString())
+
+#
     writer = tf.io.TFRecordWriter(FLAGS.output_path)
-    json_file_path = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/labels/bdd100k_labels_images_train.json'
+    json_file_path = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/labels/toy_labels_eval.json'
     src_dir = '/media/mdinh/3d67e268-6eff-4dc7-b895-4286e7226904/BDD100k/bdd100k/'
     examples =[]
   # TODO(user): Write code to read in your dataset to examples variable

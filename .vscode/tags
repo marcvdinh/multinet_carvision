@@ -1,0 +1,103 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+AUTOTUNE	../data.py	/^AUTOTUNE = tf.data.experimental.AUTOTUNE$/;"	kind:variable	line:9
+AUTOTUNE	../train.py	/^AUTOTUNE = tf.data.experimental.AUTOTUNE$/;"	kind:variable	line:12
+BACKBONE	../enum.py	/^class BACKBONE(Enum):$/;"	kind:class	line:23
+BOX_LOSS	../enum.py	/^class BOX_LOSS(Enum):$/;"	kind:class	line:30
+BatchNormalization	../override.py	/^    def BatchNormalization(self, **kwargs):$/;"	kind:member	line:201
+CarNet	../model.py	/^class CarNet:$/;"	kind:class	line:10
+DARKNET53	../enum.py	/^    DARKNET53 = 2$/;"	kind:variable	line:26
+DATASET_MODE	../enum.py	/^class DATASET_MODE(Enum):$/;"	kind:class	line:36
+DEBUG	../enum.py	/^    DEBUG = 1$/;"	kind:variable	line:18
+Dataset	../data.py	/^class Dataset(tf.keras.callbacks.Callback):$/;"	kind:class	line:12
+EFFICIENTNET	../enum.py	/^    EFFICIENTNET = 1$/;"	kind:variable	line:25
+GIOU	../enum.py	/^    GIOU = 1$/;"	kind:variable	line:32
+IMAGE	../enum.py	/^    IMAGE = 1$/;"	kind:variable	line:6
+MAP	../enum.py	/^    MAP = 5$/;"	kind:variable	line:10
+MKL	../enum.py	/^    MKL = 2$/;"	kind:variable	line:19
+MOBILENETV2	../enum.py	/^    MOBILENETV2 = 0$/;"	kind:variable	line:24
+MODE	../enum.py	/^class MODE(Enum):$/;"	kind:class	line:4
+MSE	../enum.py	/^    MSE = 0$/;"	kind:variable	line:31
+MobilenetConv2D	../model.py	/^    def MobilenetConv2D(self,kernel, alpha, filters):$/;"	kind:member	line:96
+MobilenetSeparableConv2D	../model.py	/^    def MobilenetSeparableConv2D(self,filters,$/;"	kind:member	line:20
+ModelFactory	../utils.py	/^class ModelFactory(object):$/;"	kind:class	line:304
+OPT	../enum.py	/^class OPT(Enum):$/;"	kind:class	line:16
+PRUNE	../enum.py	/^    PRUNE = 6$/;"	kind:variable	line:11
+SERVING	../enum.py	/^    SERVING = 4$/;"	kind:variable	line:9
+TEST	../enum.py	/^    TEST = 2/;"	kind:variable	line:39
+TFJS	../enum.py	/^    TFJS = 7$/;"	kind:variable	line:12
+TFLITE	../enum.py	/^    TFLITE = 3$/;"	kind:variable	line:8
+TRAIN	../enum.py	/^    TRAIN = 0$/;"	kind:variable	line:37
+TRAIN	../enum.py	/^    TRAIN = 0$/;"	kind:variable	line:5
+TRAIN_BACKBONE	../enum.py	/^    TRAIN_BACKBONE=8$/;"	kind:variable	line:13
+VALIDATE	../enum.py	/^    VALIDATE = 1$/;"	kind:variable	line:38
+VIDEO	../enum.py	/^    VIDEO = 2$/;"	kind:variable	line:7
+XLA	../enum.py	/^    XLA = 0$/;"	kind:variable	line:17
+YoloEval	../loss.py	/^class YoloEval(tf.keras.layers.Layer):$/;"	kind:class	line:125
+YoloLoss	../loss.py	/^    def YoloLoss(y_true,$/;"	kind:function	line:219
+_LayersOverride	../override.py	/^class _LayersOverride:$/;"	kind:class	line:86
+__getattr__	../override.py	/^    def __getattr__(self, item):$/;"	kind:member	line:277
+__init__	../data.py	/^    def __init__(self,$/;"	kind:member	line:116
+__init__	../loss.py	/^    def __init__(self,anchors,num_classes,image_shape,max_boxes=20,score_threshold=.6,iou_threshold=.5,**kwargs):$/;"	kind:member	line:126
+__init__	../model.py	/^    def __init__(self,shape, n_class,n_anchors, n_lane_embedding, n_drive_embedding, alpha):$/;"	kind:member	line:11
+__init__	../override.py	/^    def __init__(self,$/;"	kind:member	line:88
+__init__	../utils.py	/^    def __init__(self,$/;"	kind:member	line:306
+_dataset_internal	../data.py	/^    def _dataset_internal(self,files,dataset_builder,parser):$/;"	kind:member	line:88
+_fixed_padding	../override.py	/^def _fixed_padding(inputs, kernel_size, rate=1):$/;"	kind:function	line:66
+_get_num_from_name	../data.py	/^    def _get_num_from_name(self, name):$/;"	kind:member	line:136
+_identity	../model.py	/^    def _identity(self,x,**kw):$/;"	kind:member	line:93
+_make_divisible	../model.py	/^    def _make_divisible(self,v, divisor, min_value=None):$/;"	kind:member	line:84
+_make_divisible	../override.py	/^def _make_divisible(v, divisor, min_value=None):$/;"	kind:function	line:56
+bind	../utils.py	/^def bind(instance, func, as_name=None):$/;"	kind:function	line:60
+body	../loss.py	/^    def body(label, batch, out_loss, out_var, out_dist, out_reg, i):$/;"	kind:function	line:372
+box_giou	../loss.py	/^def box_giou(b1, b2):$/;"	kind:function	line:185
+box_iou	../loss.py	/^def box_iou(b1, b2):$/;"	kind:function	line:149
+build	../data.py	/^    def build(self,split=None):$/;"	kind:member	line:139
+build	../model.py	/^    def build(self,inputs=None, freeze_layers=None):$/;"	kind:member	line:337
+build	../utils.py	/^    def build(self, model_builder, freeze_layers=None, *args, **kwargs):$/;"	kind:member	line:312
+build_drivable_detection	../model.py	/^    def build_drivable_detection(self, inputs, residual, n_seg_class=None, upsample_output=True,alpha=1.0, last_layer_name=None):$/;"	kind:member	line:160
+build_encoder	../model.py	/^    def build_encoder(self,inputs, alpha=1.0):$/;"	kind:member	line:105
+build_lane_detection	../model.py	/^    def build_lane_detection(self, inputs,residual, n_seg_class=None, alpha=1.0, upsample_output=True, last_layer_name=None):       $/;"	kind:member	line:118
+build_tiny_yolo_body	../model.py	/^    def build_tiny_yolo_body(self, inputs, num_anchors, num_classes):$/;"	kind:member	line:244
+build_yolo_body	../model.py	/^    def build_yolo_body(self,inputs, residual_block5, residual_block12,num_anchors, num_classes, alpha=1.0):$/;"	kind:member	line:203
+call	../loss.py	/^    def call(self,yolo_outputs):$/;"	kind:member	line:135
+compose	../utils.py	/^def compose(*funcs):$/;"	kind:function	line:8
+compute_class_weighted_cross_entropy_loss	../loss.py	/^def compute_class_weighted_cross_entropy_loss( onehot_labels, logits, classes_weights):$/;"	kind:function	line:338
+cond	../loss.py	/^    def cond(label, batch, out_loss, out_var, out_dist, out_reg, i):$/;"	kind:function	line:369
+crop_and_pad	../utils.py	/^        def crop_and_pad(image, dx, dy):$/;"	kind:function	line:133
+data.py	../data.py	1;"	kind:file	line:1
+discriminative_loss	../loss.py	/^def discriminative_loss(prediction, correct_label, feature_dim, image_shape,$/;"	kind:function	line:362
+discriminative_loss_single	../loss.py	/^def discriminative_loss_single($/;"	kind:function	line:408
+driveSegLoss	../loss.py	/^def driveSegLoss(self, instance_seg_logits, instance_label, reuse):$/;"	kind:function	line:329
+enum.py	../enum.py	1;"	kind:file	line:1
+get_anchors	../utils.py	/^def get_anchors(anchors_path):$/;"	kind:function	line:53
+get_classes	../utils.py	/^def get_classes(classes_path):$/;"	kind:function	line:68
+get_config	../loss.py	/^    def get_config(self):$/;"	kind:member	line:138
+get_random_data	../utils.py	/^def get_random_data(image,$/;"	kind:function	line:76
+laneSegLoss	../loss.py	/^def laneSegLoss(self, binary_seg_logits, binary_label, reuse):$/;"	kind:function	line:297
+letterbox_image	../utils.py	/^def letterbox_image(image, size):$/;"	kind:function	line:18
+loss.py	../loss.py	1;"	kind:file	line:1
+make_last_layers_mobilenet	../model.py	/^    def make_last_layers_mobilenet(self,x, id, num_filters, out_filters):$/;"	kind:member	line:39
+mobilenet_v2	../override.py	/^def mobilenet_v2(default_batchnorm_momentum=0.999,$/;"	kind:function	line:281
+model	../model.py	/^    model = CarNet(shape=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=4, alpha=1.4)$/;"	kind:variable	line:371
+model.py	../model.py	1;"	kind:file	line:1
+on_batch_end	../data.py	/^    def on_batch_end(self, batch, logs=None):$/;"	kind:member	line:14
+override.py	../override.py	1;"	kind:file	line:1
+parse_text	../data.py	/^    def parse_text(self, line):$/;"	kind:member	line:57
+parse_tfrecord	../data.py	/^    def parse_tfrecord(self, example_proto):$/;"	kind:member	line:19
+preprocess_true_boxes	../utils.py	/^def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):$/;"	kind:function	line:237
+random_blur	../utils.py	/^def random_blur(image):$/;"	kind:function	line:44
+random_gamma	../utils.py	/^def random_gamma(image, min, max):$/;"	kind:function	line:39
+ret	../model.py	/^    ret = model.build(inputs=test_in_tensor, freeze_layers=155)$/;"	kind:variable	line:372
+test_in_tensor	../model.py	/^    test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')$/;"	kind:variable	line:370
+train	../train.py	/^def train(FLAGS):$/;"	kind:function	line:17
+train.py	../train.py	1;"	kind:file	line:1
+utils.py	../utils.py	1;"	kind:file	line:1
+yolo_boxes_and_scores	../loss.py	/^def yolo_boxes_and_scores(feats: tf.Tensor, anchors: List[Tuple[float, float]],$/;"	kind:function	line:65
+yolo_correct_boxes	../loss.py	/^def yolo_correct_boxes(box_xy: tf.Tensor, box_wh: tf.Tensor,$/;"	kind:function	line:37
+yolo_eval	../loss.py	/^def yolo_eval(yolo_outputs: List[tf.Tensor],$/;"	kind:function	line:78
+yolo_head	../loss.py	/^def yolo_head(feats: tf.Tensor,$/;"	kind:function	line:8

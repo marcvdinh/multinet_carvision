@@ -3,7 +3,7 @@
 import collections
 import tensorflow as tf
 from typing import List, Tuple
-from utils import compose
+from tools.utils import compose
 from override import mobilenet_v2
 
 

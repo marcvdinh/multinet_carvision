@@ -1,9 +1,9 @@
 import tensorflow as tf 
 from typing import List, Tuple
-from enum import BOX_LOSS
+from tools.enum import BOX_LOSS
 import numpy as np
 
-CFG.TRAIN.EMBEDDING_FEATS_DIMS=4
+#CFG.TRAIN.EMBEDDING_FEATS_DIMS=4
 
 def yolo_head(feats: tf.Tensor,
               anchors: np.ndarray,
@@ -301,7 +301,7 @@ def laneSegLoss(self, binary_seg_logits, binary_label, reuse):
                                         shape=[binary_label.get_shape().as_list()[0],
                                         binary_label.get_shape().as_list()[2],
                                         binary_label.get_shape().as_list()[3]]),
-                                    depth=CFG.TRAIN.CLASSES_NUMS,
+                                    depth=4,
                                     axis=1
                                     )
 
@@ -330,7 +330,7 @@ def driveSegLoss(self, instance_seg_logits, instance_label, reuse):
     pix_image_shape = (instance_seg_logits.get_shape().as_list()[1], instance_seg_logit.get_shape().as_list()[2])
     instance_segmentation_loss, l_var, l_dist, l_reg = \
                         discriminative_loss(
-                        instance_seg_logit, instance_label, CFG.TRAIN.EMBEDDING_FEATS_DIMS,
+                        instance_seg_logit, instance_label,4,
                         pix_image_shape, 0.5, 3.0, 1.0, 1.0, 0.001
                     )
     return pix_embedding, instance_segmentation_loss

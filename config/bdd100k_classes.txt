@@ -1,0 +1,11 @@
+traffic sign
+traffic lig: green
+traffic lig: red
+traffic lig: none
+car
+rider
+motor
+bike
+bus
+truck
+person
