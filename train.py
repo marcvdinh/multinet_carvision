@@ -2,7 +2,7 @@ import tensorflow as tf
 import datetime
 import zipfile
 from data import Dataset
-from tools.enum import OPT, BACKBONE, DATASET_MODE
+from tools.modes import OPT, BACKBONE, DATASET_MODE
 from tools.map import MAPCallback
 from tools.utils import get_anchors, get_classes,ModelFactory
 import os
@@ -10,6 +10,8 @@ import numpy as np
 from tensorflow.python import debug as tf_debug
 from loss import YoloLoss, laneSegLoss, driveSegLoss
 from model import CarNet
+
+
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 tf.keras.backend.set_learning_phase(1)
@@ -18,7 +20,7 @@ tf.keras.backend.set_learning_phase(1)
 def train(FLAGS):
     prune = FLAGS['prune']
     opt = FLAGS['opt']
-    backbone = "mobilenetv2" #FLAGS['backbone']
+    backbone = FLAGS['backbone']
     log_dir = FLAGS['log_directory'] or os.path.join('logs',str(backbone).split('.')[1].lower()+str(datetime.date.today()))
     if tf.io.gfile.exists(log_dir) is not True:
         tf.io.gfile.mkdir(log_dir)
@@ -48,7 +50,7 @@ def train(FLAGS):
 
     strategy = tf.distribute.MirroredStrategy()
     batch_size = batch_size * strategy.num_replicas_in_sync
-
+    #print([train_dataset_glob,batch_size, anchors, num_classes, input_shape])
     train_dataset_callback = Dataset(train_dataset_glob,
                                      batch_size,
                                      anchors,
@@ -89,22 +91,27 @@ def train(FLAGS):
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
     if tf.version.VERSION.startswith('1.'):
-        yolo_loss = [
-            lambda y_true, yolo_output: YoloLoss(
-                y_true, yolo_output, 0, anchors, print_loss=False), lambda
-            y_true, yolo_output: YoloLoss(
-                y_true, yolo_output, 1, anchors, print_loss=False), lambda
-            y_true, yolo_output: YoloLoss(
-                y_true, yolo_output, 2, anchors, print_loss=False)
-        ]
-        lane_loss = laneSegLoss(output_lane, lane_label)
-        drive_loss = driveSegLoss(output_drive, drive_label)
-        loss = [lane_loss , drive_loss, yolo_loss]
+        yolo_loss_1 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 0, anchors, print_loss=False)           
+        yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
+        yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
+        
+        lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
+        drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
+        losses = [lane_loss , drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
+
+        #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}
     else:
+        #TODO segmentation loss
         loss = [YoloLoss(idx, anchors, print_loss=False) for idx in range(3)]
 
     with strategy.scope():
-        multinet = CarNet(tf.keras.layers.Input(shape=(*input_shape,3)),weights_path=model_path,n_class=num_classes, n_anchors = len(anchors)//3, n_lane_embedding = 2, n_drive_embedding = 4,alpha=FLAGS['alpha'])
+        multinet = CarNet(tf.keras.layers.Input(shape=(*input_shape,3)),
+                                                weights_path=model_path,
+                                                n_class=num_classes,
+                                                n_anchors=len(anchors)//3,
+                                                n_lane_embedding=4,#5,
+                                                n_drive_embedding=2,#3,
+                                                alpha=1.4)
         model = multinet.build(freeze_layers=155)
 
 
@@ -156,8 +163,9 @@ def train(FLAGS):
 
     if True:
         with strategy.scope():
+            print("training Phase 1")
             model.compile(optimizer=tf.keras.optimizers.Adam(lr[0],epsilon=1e-8),
-                                loss=loss)
+                          loss=losses)
         model.fit(
             train_dataset,
             epochs=freeze_step,
@@ -174,18 +182,18 @@ def train(FLAGS):
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
     if True:
-        for i in range(100,len(model.layers)):
+        for i in range(100, len(model.layers)):
             model.layers[i].trainable = True
         with strategy.scope():
             model.compile(optimizer=tf.keras.optimizers.Adam(lr[1],epsilon=1e-8),
-                               loss=loss)  # recompile to apply the change
+                               loss=losses)  # recompile to apply the change
         print('finetune at layer 100.')
         model.fit(train_dataset,
                            epochs=train_step + freeze_step,
                            initial_epoch=freeze_step,
                            steps_per_epoch=max(1, train_num // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, logging, map_callback, early_stopping
+                               checkpoint, cos_lr, early_stopping #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))

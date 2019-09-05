@@ -6,7 +6,7 @@ if tf.version.VERSION.startswith('1.'):
     tf.enable_v2_behavior()
 if tf.version.VERSION.startswith('1.'):
     tf.enable_v2_tensorshape()
-from tools.enum import BACKBONE, MODE, OPT
+from tools.modes import BACKBONE, MODE, OPT
 from train import train
 #from train_backbone import train as train_backbone
 from backend import YOLO, detect_video, detect_img, export_tflite_model, export_serving_model, calculate_map, export_tfjs_model
@@ -32,12 +32,12 @@ flags.DEFINE_multi_integer('epochs',
 flags.DEFINE_string('export', default='export_model/8', help="Export path")
 flags.DEFINE_string('input', default=None, help="Input data for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(256, 256),
+                           default=(224, 224),
                            lower_bound=0,
                            help="Input size")
-flags.DEFINE_string('log_directory', default="log", help="Log directory")
+flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
 flags.DEFINE_string(
-    'model',
+    'model',    
     default='../download/mobilenetv2_trained_weights_final (1).h5',
     help="Model path")
 flags.DEFINE_enum_class(
@@ -56,13 +56,13 @@ flags.DEFINE_string('val_dataset',
                     default='data/eval/*.tfrecords',
                     help="Dataset glob for validate")
 flags.DEFINE_string('test_dataset',
-                    default='../pascal/VOCdevkit/test/*2007*.tfrecords',
+                    default='data/eval/*.tfrecords',
                     help="Dataset glob for test")
 flags.DEFINE_string('anchors_path',
                     default='config/yolo_anchors.txt',
                     help="Anchors path")
 flags.DEFINE_string('classes_path',
-                    default='config/voc_classes.txt',
+                    default='config/bdd100k_classes.txt',
                     help="Classes Path")
 flags.DEFINE_multi_float('learning_rate',
                          default=[1e-3, 1e-4],

@@ -99,7 +99,6 @@ def get_random_data(image,
                     max_jpeg_quality=100,
                     train: bool = True):
     '''random preprocessing for real-time data augmentation'''
-
     iw, ih = tf.cast(tf.shape(image)[1],
                      tf.float32), tf.cast(tf.shape(image)[0], tf.float32)
     w, h = tf.cast(input_shape[1], tf.float32), tf.cast(input_shape[0],
@@ -158,7 +157,7 @@ def get_random_data(image,
             .pad_to_bounding_box(lane_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
-        lane_label = new_lane_label
+        lane_label = tf.cast(tf.equal(new_lane_label,0), tf.float32)
 
         new_drive_label = tf.cond(
             tf.greater(scale,
@@ -166,7 +165,7 @@ def get_random_data(image,
             .pad_to_bounding_box(drive_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
-        drive_label = new_drive_label
+        drive_label = tf.cast(tf.equal(new_drive_label,0), tf.float32)
 
 
         xmins = xmins * nw / iw + dx
@@ -214,6 +213,32 @@ def get_random_data(image,
         image_color_padded = tf.cast(tf.equal(new_image, 0),
                                      tf.float32) * (128 / 255)
         image = image_color_padded + new_image
+        
+        lane_label = tf.image.resize(lane_label,
+                                [tf.cast(nh, tf.int32),
+                                 tf.cast(nw, tf.int32)])
+        
+        drive_label = tf.image.resize(drive_label,
+                                [tf.cast(nh, tf.int32),
+                                 tf.cast(nw, tf.int32)])
+        
+        new_lane_label = tf.image.pad_to_bounding_box(lane_label, 
+                                                  tf.cast(dy, tf.int32), 
+                                                  tf.cast(dx, tf.int32),
+                                                  tf.cast(h, tf.int32), 
+                                                  tf.cast(w, tf.int32))
+        
+        new_drive_label = tf.image.pad_to_bounding_box(drive_label, 
+                                                   tf.cast(dy, tf.int32),
+                                                   tf.cast(dx, tf.int32),
+                                                   tf.cast(h, tf.int32),
+                                                   tf.cast(w, tf.int32))
+        
+        #lane_label_padded = tf.cast(tf.equal(new_lane_label,0), tf.float32) * 0.5
+        #drive_label_padded = tf.cast(tf.equal(new_drive_label,0), tf.float32) * 0.5
+
+        lane_label = new_lane_label
+        drive_label = new_drive_label
         xmins = xmins * nw / iw + dx
         xmaxs = xmaxs * nw / iw + dx
         ymins = ymins * nh / ih + dy
@@ -232,7 +257,7 @@ def get_random_data(image,
     bbox = tf.cond(tf.greater(
         tf.shape(bbox)[0], max_boxes), lambda: bbox[:max_boxes], lambda: bbox)
 
-    return image,lane_label, drive_label, bbox
+    return image, lane_label, drive_label, bbox
 
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     '''Preprocess true boxes to training input format
@@ -300,6 +325,27 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
 
     return y_true[0], y_true[1], y_true[2]
 
+def expand_seg_label(label, Ncl, label_type):
+    """
+    uncompress a grayscale mask into n-dimension groundtruth with n the number of classes
+    """
+    #TODO replace hard coded values
+    label = tf.tile( label, [1, 1, Ncl])
+    #tf.print(tf.shape(label))
+    #masks = tf.zeros([224, 224, Ncl], tf.float32)
+    #masks = tf.cond( tf.cast(label_type == "lane", tf.bool),
+    #    lambda: tf.cast(tf.equal(label, lane_classes), tf.float32),
+    #    lambda: tf.cast(tf.equal(label, drive_classes), tf.float32))
+    if label_type == "lane":
+        lane_classes = tf.broadcast_to( tf.constant([120,170,220,255], dtype=tf.uint8, name="lane_levels"), [720,1280,Ncl])
+        #tf.print(tf.shape(lane_classes))
+        masks = tf.cast(tf.equal(label, lane_classes), tf.float32)
+    else:
+        drive_classes = tf.broadcast_to(tf.constant([1,2], dtype=tf.uint8, name="drive_levels"), [720, 1280, Ncl])
+        #tf.print(tf.shape(drive_classes))
+        masks = tf.cast(tf.equal(label, drive_classes), tf.float32)
+    #tf.print(masks)
+    return masks
 
 class ModelFactory(object):
 

@@ -4,7 +4,7 @@ from loss import yolo_eval
 from tools.utils import letterbox_image, bind
 from timeit import default_timer as timer
 from data import Dataset
-from tools.enum import DATASET_MODE
+from tools.modes import DATASET_MODE
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 

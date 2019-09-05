@@ -11,7 +11,7 @@ import cv2
 import tensorflow as tf
 from loss import yolo_eval, YoloEval
 from tools.utils import letterbox_image, get_anchors, get_classes
-from tools.enum import OPT, BACKBONE
+from tools.modes import OPT, BACKBONE
 from tools.map import MAPCallback
 import os
 from typing import List, Tuple

@@ -8,8 +8,9 @@ from override import mobilenet_v2
 
 
 class CarNet:
-    def __init__(self,shape, n_class,n_anchors, n_lane_embedding, n_drive_embedding, alpha):
-        self.shape = shape
+    def __init__(self,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
+        self.inputs = inputs
+        self.weights_path = weights_path
         self.n_class = n_class
         self.n_anchors = n_anchors
         self.n_lane_embedding = n_lane_embedding
@@ -151,12 +152,12 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    x_final = tf.keras.layers.UpSampling2D(size=8)(x_final)
+                    lane_output = tf.keras.layers.UpSampling2D(size=8, name="lane_seg")(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
 
-                return x_final
+                return lane_output
 
     def build_drivable_detection(self, inputs, residual, n_seg_class=None, upsample_output=True,alpha=1.0, last_layer_name=None):
             
@@ -194,12 +195,12 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    x_final = tf.keras.layers.UpSampling2D(size=8)(x_final)
+                    drive_output = tf.keras.layers.UpSampling2D(size=8, name="drive_seg")(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
 
-                return x_final
+                return drive_output
 
     def build_yolo_body(self,inputs, residual_block5, residual_block12,num_anchors, num_classes, alpha=1.0):
 
@@ -241,7 +242,10 @@ class CarNet:
         y1=tf.keras.layers.Lambda(lambda y: tf.reshape(y,[-1,tf.shape(y)[1],tf.shape(y)[2],num_anchors,num_classes + 5]), name='y1')(y1)
         y2=tf.keras.layers.Lambda(lambda y: tf.reshape(y,[-1,tf.shape(y)[1], tf.shape(y)[2], num_anchors, num_classes + 5]), name='y2')(y2)
         y3=tf.keras.layers.Lambda(lambda y: tf.reshape(y,[-1,tf.shape(y)[1], tf.shape(y)[2], num_anchors, num_classes + 5]), name='y3')(y3)
-        return [y1, y2, y3]
+
+        yolo_output = [y1,y2,y3]
+        return yolo_output
+   
     def build_tiny_yolo_body(self, inputs, num_anchors, num_classes):
         '''Create Tiny YOLO_v3 model CNN body in keras.'''
         x1 = compose(
@@ -337,7 +341,7 @@ class CarNet:
 
     def build(self,inputs=None, freeze_layers=None):
         if inputs is None:
-            inputs = tf.keras.layers.Input(shape=self.shape)
+            inputs = self.inputs
 
         encoder = self.build_encoder(inputs, alpha=self._alpha)
         encoder_output = encoder.output
@@ -345,13 +349,13 @@ class CarNet:
         residual_block12 = encoder.get_layer('block_12_project_BN').output
         residual_block5 = encoder.get_layer('block_5_project_BN').output
         segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 5
-        #print(segmentation_head.get_shape().as_list)
+        
         lane_seg_decoder = self.build_lane_detection(segmentation_head, residual_block5, alpha=self._alpha)
         drive_seg_decoder =  self.build_drivable_detection(segmentation_head, residual_block5, alpha=self._alpha) 
         yolo_decoder = self.build_yolo_body(  encoder_output, residual_block5, residual_block12,self.n_anchors, self.n_class, alpha=self._alpha)
+        #TODO implement tiny yolo as a detector head
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
          
-        #model = tf.keras.Model(inputs, encoder.output)
         model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
         
         # Freeze the encoder.
@@ -369,7 +373,7 @@ if __name__ == '__main__':
     test code
     """
     test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')
-    model = CarNet(shape=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=4, alpha=1.4)
+    model = CarNet(inputs=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=2, alpha=1.4)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
         ret,

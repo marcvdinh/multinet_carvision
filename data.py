@@ -1,10 +1,13 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
 import tensorflow as tf
 from functools import reduce
-from tools.utils import get_random_data,preprocess_true_boxes
-from tools.enum import DATASET_MODE
+from tools.utils import get_random_data,preprocess_true_boxes, get_anchors, expand_seg_label
+from tools.modes import DATASET_MODE
 from random import random
 import tensorflow_datasets as tfds
 import math
+import matplotlib.pyplot as plt 
+import sys
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -18,6 +21,7 @@ class Dataset(tf.keras.callbacks.Callback):
 
     def parse_tfrecord(self, example_proto):
         feature_description = {
+            'image/filename': tf.io.FixedLenFeature([], tf.string),
             'image/encoded': tf.io.FixedLenFeature([], tf.string),
             'image/lane': tf.io.FixedLenFeature([], tf.string),
             'image/drive': tf.io.FixedLenFeature([], tf.string),
@@ -29,24 +33,34 @@ class Dataset(tf.keras.callbacks.Callback):
         }
         features = tf.io.parse_single_example(example_proto,
                                               feature_description)
+        filename = tf.compat.as_str_any(features['image/filename'])
+        
         image = tf.image.decode_image(features['image/encoded'],
                                       channels=3,
                                       dtype=tf.float32)
         image.set_shape([None, None, 3])
-        lane = tf.image.decode_image(features['image/lane'],
-                                      channels=3,
-                                      dtype=tf.float32)
-        lane.set_shape([None, None, 3])
-        drive = tf.image.decode_image(features['image/drive'],
-                                      channels=3,
-                                      dtype=tf.float32)
-        drive.set_shape([None, None, 3])
+        lane = expand_seg_label(tf.image.decode_image(features['image/lane'],
+                                      channels=1,
+                                      dtype=tf.uint8
+                                      ),
+                                      4, 
+                                      "lane")
+        lane.set_shape([None, None, 4])
+        
+        drive = expand_seg_label(tf.image.decode_image(features['image/drive'],
+                                      channels=1,
+                                      dtype=tf.uint8
+                                      ),
+                                      2,
+                                      "drive") 
+        drive.set_shape([None, None, 2])
+
         xmins = features['image/object/bbox/xmin'].values
         xmaxs = features['image/object/bbox/xmax'].values
         ymins = features['image/object/bbox/ymin'].values
         ymaxs = features['image/object/bbox/ymax'].values
         labels = features['image/object/bbox/label'].values
-        image, bbox = get_random_data(image,
+        image, lane_label, drive_label, bbox = get_random_data(image,
                                       lane,
                                       drive,
                                       xmins,
@@ -56,6 +70,7 @@ class Dataset(tf.keras.callbacks.Callback):
                                       labels,
                                       self.input_shape,
                                       train=self.mode == DATASET_MODE.TRAIN)
+        
         y1, y2, y3 = tf.py_function(
             preprocess_true_boxes,
             [bbox, self.input_shape, self.anchors, self.num_classes],
@@ -64,63 +79,24 @@ class Dataset(tf.keras.callbacks.Callback):
         y2.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
         y3.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
 
-        return image,lane, drive, (y1, y2, y3)
-
-    def parse_text(self, line):
-        values = tf.strings.split([line],' ').values
-        image = tf.image.decode_image(tf.io.read_file(values[0]),
-                                      channels=3,
-                                      dtype=tf.float32)
-        image.set_shape([None, None, 3])
-        reshaped_data = tf.reshape(values[1:], [-1, 5])
-        xmins = tf.strings.to_number(reshaped_data[:, 0], tf.float32)
-        xmaxs = tf.strings.to_number(reshaped_data[:, 2], tf.float32)
-        ymins = tf.strings.to_number(reshaped_data[:, 1], tf.float32)
-        ymaxs = tf.strings.to_number(reshaped_data[:, 3], tf.float32)
-        labels = tf.strings.to_number(reshaped_data[:, 4], tf.int64)
-
-        image, bbox = get_random_data(image,
-                                      xmins,
-                                      xmaxs,
-                                      ymins,
-                                      ymaxs,
-                                      labels,
-                                      self.input_shape,
-                                      train=self.mode == DATASET_MODE.TRAIN)
-        y1, y2, y3 = tf.py_function(
-            preprocess_true_boxes,
-            [bbox, self.input_shape, self.anchors, self.num_classes],
-            [tf.float32, tf.float32, tf.float32])
-        y1.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
-        y2.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
-        y3.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
-
-        return image, (y1, y2, y3)
+        return image, (lane_label, drive_label, y1, y2, y3)
 
     def _dataset_internal(self,files,dataset_builder,parser):
-        dataset = tf.data.Dataset.from_tensor_slices(files)
+        dataset = dataset_builder(files)
         if self.mode == DATASET_MODE.TRAIN:
-            train_num = reduce(
-                lambda x, y: x + y,
-                map(lambda file: int(self._get_num_from_name(file)),files))
-            dataset = dataset.interleave(
-                lambda file: dataset_builder(file),
-                cycle_length=len(files),
-                num_parallel_calls=AUTOTUNE).shuffle(train_num).map(
+            #train_num = reduce(
+            #    lambda x, y: x + y,
+            #    map(lambda file: int(self._get_num_from_name(file)), files))
+            train_num = 1000
+            dataset = dataset.shuffle(train_num).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
-            dataset = dataset.interleave(
-                lambda file: dataset_builder(file),
-                cycle_length=len(files),
-                num_parallel_calls=AUTOTUNE).map(
+            dataset = dataset.shuffle(1000).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.TEST:
-            dataset = dataset.interleave(
-                lambda file: dataset_builder(file),
-                cycle_length=len(files),
-                num_parallel_calls=AUTOTUNE).map(
+            dataset = dataset.map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size)
         return dataset
@@ -137,7 +113,7 @@ class Dataset(tf.keras.callbacks.Callback):
         if isinstance(input_shapes, list):
             self.input_shapes = input_shapes
             self.input_shape = tf.Variable(name="input_shape",
-                                           initial_value=self.input_shapes[0],
+                                           initial_value=self.input_shapes,
                                            trainable=False)
         else:
             self.input_shape = input_shapes
@@ -150,13 +126,15 @@ class Dataset(tf.keras.callbacks.Callback):
 
     def build(self,split=None):
         if self.glob_path in tfds.list_builders():
-            return tfds.load(name=self.glob_path, split=split, with_info=True,as_supervised=True,try_gcs=tfds.is_dataset_on_gcs(self.glob_path))
+            return tfds.load(name=self.glob_path, split=split, with_info=True, as_supervised=True, try_gcs=tfds.is_dataset_on_gcs(self.glob_path))
         files = tf.io.gfile.glob(self.glob_path)
         if len(files)==0:
             raise ValueError('No file found')
         try:
+            #TODO fix num
             num = reduce(lambda x, y: x + y,
                          map(lambda file: self._get_num_from_name(file), files))
+            num = 1000
         except Exception:
             raise ValueError(
                 'Please format file name like <name>_<number>.<extension>')
@@ -173,3 +151,49 @@ class Dataset(tf.keras.callbacks.Callback):
                 return tfrecords_dataset, num
             elif len(txts)>0:
                 return txts_dataset, num
+
+
+if __name__ == '__main__':
+    """
+    test code
+    """
+    anchors = get_anchors('config/yolo_anchors.txt')
+    #print(anchors)
+    #[[ 10.,  13.],
+    #   [ 16.,  30.],
+    #   [ 33.,  23.],
+    #   [ 30.,  61.],
+    #   [ 62.,  45.],
+    #   [ 59., 119.],
+    #   [116.,  90.],
+    #   [156., 198.],
+    #   [373., 326.]]
+    dataset_callback = Dataset("data/train/*.tfrecords",
+                                     8,
+                                     anchors,
+                                     11,
+                                     [224,224],
+                                     mode=DATASET_MODE.TEST)
+
+   
+    with tf.Session() as sess:
+        dataset, num = dataset_callback.build()
+
+
+        for n,image_features in dataset.enumerate():
+            gt_image = sess.run(image_features[0].eval())
+            gt_lane = sess.run(image_features[1].eval())
+            gt_drive = sess.run(image_features[2].eval())
+        
+            print(gt_lane.shape)
+            #gt_image = image_features[0].numpy()
+            #gt_lane = image_features[1].numpy()
+            #gt_drive = image_features[2].numpy()
+            fig = plt.figure()
+            fig.add_subplot(1,3,1)
+            plt.imshow(gt_image)
+            fig.add_subplot(1,3,2)
+            plt.imshow(gt_lane)
+            fig.add_subplot(1,3,3)
+            plt.imshow(gt_drive)
+            plt.show()

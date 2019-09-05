@@ -1,6 +1,6 @@
 import tensorflow as tf 
 from typing import List, Tuple
-from tools.enum import BOX_LOSS
+from tools.modes import BOX_LOSS
 import numpy as np
 
 #CFG.TRAIN.EMBEDDING_FEATS_DIMS=4
@@ -294,47 +294,21 @@ if tf.version.VERSION.startswith('1.'):
                          tf.reduce_sum(ignore_mask))
         return loss
 
-def laneSegLoss(self, binary_seg_logits, binary_label, reuse):
-    binary_label_onehot = tf.one_hot(
-                                    tf.reshape(
-                                        tf.cast(binary_label, tf.int32),
-                                        shape=[binary_label.get_shape().as_list()[0],
-                                        binary_label.get_shape().as_list()[2],
-                                        binary_label.get_shape().as_list()[3]]),
-                                    depth=4,
-                                    axis=1
-                                    )
+def laneSegLoss( lane_seg_logits, lane_labels, reuse=False):
+    lane_segmentation_loss = tversky_loss(lane_labels, lane_seg_logits)
+    return lane_segmentation_loss
 
-    binary_label_plain = tf.reshape(
-                                    binary_label,
-                                    shape=[binary_label.get_shape().as_list()[0] *
-                                            binary_label.get_shape().as_list()[1] *
-                                            binary_label.get_shape().as_list()[2] *
-                                            binary_label.get_shape().as_list()[3]])
-    unique_labels, unique_id, counts = tf.unique_with_counts(binary_label_plain)
-    counts = tf.cast(counts, tf.float32)
-    inverse_weights = tf.divide(
-                                1.0,
-                                tf.log(tf.add(tf.divide(counts, tf.reduce_sum(counts)), tf.constant(1.02)))
-                                )
-    binary_label_onehot = tf.transpose(binary_label_onehot, [0,2,3,1])
-    binary_seg_logits = tf.transpose(binary_seg_logits, [0,2,3,1]) 
-    binary_segmentation_loss = compute_class_weighted_cross_entropy_loss(
-                    onehot_labels=binary_label_onehot,
-                    logits=binary_seg_logits,
-                    classes_weights=inverse_weights
-                )
-    return binary_seg_logits, binary_segmentation_loss
-
-def driveSegLoss(self, instance_seg_logits, instance_label, reuse):
-    pix_image_shape = (instance_seg_logits.get_shape().as_list()[1], instance_seg_logit.get_shape().as_list()[2])
-    instance_segmentation_loss, l_var, l_dist, l_reg = \
-                        discriminative_loss(
-                        instance_seg_logit, instance_label,4,
-                        pix_image_shape, 0.5, 3.0, 1.0, 1.0, 0.001
-                    )
-    return pix_embedding, instance_segmentation_loss
-
+def driveSegLoss(drive_seg_logits, drive_labels, reuse=False):
+    #onehot_labels = tf.one_hot(tf.cast(drive_label, "int32"),
+    #                            2)
+    drive_segmentation_loss = tversky_loss(drive_labels, drive_seg_logits)
+    #pix_image_shape = (instance_seg_logits.shape[1], instance_seg_logits.shape[2])
+    #instance_segmentation_loss, l_var, l_dist, l_reg = \
+    #                    discriminative_loss(
+    #                    instance_seg_logits, instance_label,4,
+    #                    pix_image_shape, 0.5, 3.0, 1.0, 1.0, 0.001
+    #                )
+    return drive_segmentation_loss
 def compute_class_weighted_cross_entropy_loss( onehot_labels, logits, classes_weights):
         """
 
@@ -345,19 +319,21 @@ def compute_class_weighted_cross_entropy_loss( onehot_labels, logits, classes_we
         """
         loss_weights = tf.reduce_sum(tf.multiply(onehot_labels, classes_weights), axis=3)
         #loss_weights = tf.expand_dims(loss_weights,axis=1)
-        print("cross entropy loss shapes:")
-        print(onehot_labels.shape)
-        print(logits.shape)
-        print(loss_weights.shape)
+        #print("cross entropy loss shapes:")
+        #print(onehot_labels.shape)
+        #print(logits.shape)
+        #print(loss_weights.shape)
         #print(classes_weights.shape)
 
-        loss = tf.losses.softmax_cross_entropy(
+        loss = tf.losses.softmax_cross_entropy_with_logits(
             onehot_labels=onehot_labels,
             logits=logits,
             weights=loss_weights
         )
 
         return loss
+
+
 
 def discriminative_loss(prediction, correct_label, feature_dim, image_shape,
                         delta_v, delta_d, param_var, param_dist, param_reg):
@@ -487,3 +463,26 @@ def discriminative_loss_single(
     loss = param_scale * (l_var + l_dist + l_reg)
 
     return loss, l_var, l_dist, l_reg
+
+
+def tversky_loss(y_true, y_pred):
+    """
+        alpha = beta = 0.5 Dice Loss
+        alpha + beta = 1 Tanimoto Coefficient
+        alpha+beta=1    produces set of F*-scores
+    """
+    alpha = 0.3 #0.5
+    beta = 0.7 #0.5
+    ones = tf.ones(tf.shape(y_true))
+    p0 = y_pred      # pred proba that pixels are class i
+    p1 = ones-y_pred # pred proba that pixels are not class i
+    g0 = y_true     # proba that pixels are class i
+    g1 = ones-y_true # proba that pixels are not class i
+    
+    num = tf.reduce_sum(tf.math.multiply(p0,g0), [0,1,2])
+    den = num + alpha*tf.reduce_sum(tf.math.multiply(p0,g1), [0,1,2]) + beta*tf.reduce_sum(tf.math.multiply(p1,g0), [0,1,2])
+    
+    T = tf.reduce_sum(num/den) # when summing over classes, T has dynamic range [0 Ncl]  
+    Ncl = tf.cast(tf.shape(y_true)[-1], 'float32')
+    loss = (Ncl-T)
+    return loss
