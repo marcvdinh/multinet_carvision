@@ -12,7 +12,7 @@ import tensorflow as tf
 from loss import yolo_eval, YoloEval
 from tools.utils import letterbox_image, get_anchors, get_classes
 from tools.modes import OPT, BACKBONE
-from tools.map import MAPCallback
+from tools.callbacks import MAPCallback
 import os
 from typing import List, Tuple
 from tensorflow_serving.apis import prediction_log_pb2, predict_pb2
@@ -425,3 +425,6 @@ def detect_video(yolo: YOLO, video_path: str, output_path: str = ""):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     yolo.close_session()
+
+
+    #TODO Segmentation backend

@@ -3,7 +3,7 @@ import datetime
 import zipfile
 from data import Dataset
 from tools.modes import OPT, BACKBONE, DATASET_MODE
-from tools.map import MAPCallback
+from tools.callbacks import MAPCallback
 from tools.utils import get_anchors, get_classes,ModelFactory
 import os
 import numpy as np

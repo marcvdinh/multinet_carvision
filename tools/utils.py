@@ -157,15 +157,16 @@ def get_random_data(image,
             .pad_to_bounding_box(lane_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
-        lane_label = tf.cast(tf.equal(new_lane_label,0), tf.float32)
-
+        #lane_label = tf.cast(tf.equal(new_lane_label,0), tf.float32)
+        lane_label = new_lane_label
         new_drive_label = tf.cond(
             tf.greater(scale,
                        1), lambda: crop_and_pad(drive_label, dx, dy), lambda: tf.image
             .pad_to_bounding_box(drive_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
-        drive_label = tf.cast(tf.equal(new_drive_label,0), tf.float32)
+        #drive_label = tf.cast(tf.equal(new_drive_label,0), tf.float32)
+        drive_label = new_drive_label
 
 
         xmins = xmins * nw / iw + dx

@@ -470,10 +470,14 @@ def tversky_loss(y_true, y_pred):
         alpha = beta = 0.5 Dice Loss
         alpha + beta = 1 Tanimoto Coefficient
         alpha+beta=1    produces set of F*-scores
+        gamma = 1 tversky loss
     """
     alpha = 0.3 #0.5
     beta = 0.7 #0.5
+    gamma = 4/3 
     ones = tf.ones(tf.shape(y_true))
+    Ncl = tf.cast(tf.shape(y_true)[-1], 'int32')
+    gammas = tf.tile([1/gamma], [Ncl])
     p0 = y_pred      # pred proba that pixels are class i
     p1 = ones-y_pred # pred proba that pixels are not class i
     g0 = y_true     # proba that pixels are class i
@@ -481,8 +485,6 @@ def tversky_loss(y_true, y_pred):
     
     num = tf.reduce_sum(tf.math.multiply(p0,g0), [0,1,2])
     den = num + alpha*tf.reduce_sum(tf.math.multiply(p0,g1), [0,1,2]) + beta*tf.reduce_sum(tf.math.multiply(p1,g0), [0,1,2])
-    
-    T = tf.reduce_sum(num/den) # when summing over classes, T has dynamic range [0 Ncl]  
-    Ncl = tf.cast(tf.shape(y_true)[-1], 'float32')
-    loss = (Ncl-T)
+    TI = num/den
+    loss = tf.reduce_sum(tf.math.pow((tf.ones(Ncl) - TI), gammas))
     return loss
