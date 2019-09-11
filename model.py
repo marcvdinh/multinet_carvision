@@ -28,12 +28,12 @@ class CarNet:
                                             padding=padding,
                                             use_bias=use_bias,
                                             strides=strides),
-            tf.keras.layers.BatchNormalization(), tf.keras.layers.ReLU(6.),
+            tf.keras.layers.BatchNormalization(fused=True), tf.keras.layers.ReLU(6.),
             tf.keras.layers.Conv2D(filters,
                                 1,
                                 padding='same',
                                 use_bias=use_bias,
-                                strides=1), tf.keras.layers.BatchNormalization(),
+                                strides=1), tf.keras.layers.BatchNormalization(fused=True),
             tf.keras.layers.ReLU(6.))
 
 
@@ -44,7 +44,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False,
                                 name='block_' + str(id) + '_conv'),
-            tf.keras.layers.BatchNormalization(momentum=0.9,
+            tf.keras.layers.BatchNormalization(momentum=0.9, fused=True,
                                             name='block_' + str(id) + '_BN'),
             tf.keras.layers.ReLU(6., name='block_' + str(id) + '_relu6'),
             self.MobilenetSeparableConv2D(2 * num_filters,
@@ -56,7 +56,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False,
                                 name='block_' + str(id + 1) + '_conv'),
-            tf.keras.layers.BatchNormalization(momentum=0.9,
+            tf.keras.layers.BatchNormalization(momentum=0.9, fused=True,
                                             name='block_' + str(id + 1) + '_BN'),
             tf.keras.layers.ReLU(6., name='block_' + str(id + 1) + '_relu6'),
             self.MobilenetSeparableConv2D(2 * num_filters,
@@ -68,7 +68,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False,
                                 name='block_' + str(id + 2) + '_conv'),
-            tf.keras.layers.BatchNormalization(momentum=0.9,
+            tf.keras.layers.BatchNormalization(momentum=0.9, fused=True,
                                             name='block_' + str(id + 2) + '_BN'),
             tf.keras.layers.ReLU(6., name='block_' + str(id + 2) + '_relu6'))(x)
         y = compose(
@@ -101,7 +101,7 @@ class CarNet:
                                 kernel,
                                 padding='same',
                                 use_bias=False),
-            tf.keras.layers.BatchNormalization(), tf.keras.layers.ReLU(6.))
+            tf.keras.layers.BatchNormalization(fused=True), tf.keras.layers.ReLU(6.))
 
     def build_encoder(self,inputs, alpha=1.0):
         mobilenetv2 = mobilenet_v2(default_batchnorm_momentum=0.9,
@@ -124,7 +124,7 @@ class CarNet:
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
                             use_bias=False)(inputs)
-                x_up = tf.keras.layers.BatchNormalization(epsilon=1e-5)(x_up)
+                x_up = tf.keras.layers.BatchNormalization(epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
 
                 # avg pool
@@ -168,7 +168,7 @@ class CarNet:
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
                             use_bias=False)(inputs)
-                x_up = tf.keras.layers.BatchNormalization( epsilon=1e-5)(x_up)
+                x_up = tf.keras.layers.BatchNormalization( epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
 
                 # avg pool
@@ -212,7 +212,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False,
                                 name='block_20_conv'),
-            tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+            tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
             tf.keras.layers.ReLU(6., name='block_20_relu6'),
             tf.keras.layers.UpSampling2D(2))(x)
         x = tf.keras.layers.Concatenate()([
@@ -229,7 +229,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False,
                                 name='block_24_conv'),
-            tf.keras.layers.BatchNormalization(momentum=0.9, name='block_24_BN'),
+            tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_24_BN'),
             tf.keras.layers.ReLU(6., name='block_24_relu6'),
             tf.keras.layers.UpSampling2D(2))(x)
         x = tf.keras.layers.Concatenate()([
@@ -253,14 +253,14 @@ class CarNet:
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6., name='block_20_relu6'),
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same'),
                 tf.keras.layers.Conv2D(32,
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same'),
                 tf.keras.layers.Conv2D(64,
@@ -268,7 +268,7 @@ class CarNet:
                                 padding='same',
                                 use_bias=False
                                 ),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same'),
                 tf.keras.layers.Conv2D(128,
@@ -276,14 +276,14 @@ class CarNet:
                                 padding='same',
                                 use_bias=False
                                 ),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same'),
                 tf.keras.layers.Conv2D(256,
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.))(inputs)
         x2 = compose(
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), padding='same'),
@@ -291,27 +291,27 @@ class CarNet:
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(1,1), padding='same'),
                 tf.keras.layers.Conv2D(1024,
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.Conv2D(256,
                                 kernel_size=1,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.))(x1)
         y1 = compose(
                 tf.keras.layers.Conv2D(512,
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.Conv2D(num_anchors*(num_classes+5),
                                 kernel_size=1,
@@ -322,7 +322,7 @@ class CarNet:
                                 kernel_size=1,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True,  name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.UpSampling2D(2))(x2)
         y2 = compose(
@@ -331,7 +331,7 @@ class CarNet:
                                 kernel_size=3,
                                 padding='same',
                                 use_bias=False),
-                tf.keras.layers.BatchNormalization(momentum=0.9, name='block_20_BN'),
+                tf.keras.layers.BatchNormalization(momentum=0.9, fused=True, name='block_20_BN'),
                 tf.keras.layers.ReLU(6.),
                 tf.keras.layers.Conv2D(num_anchors*(num_classes+5),
                                 kernel_size=1,
@@ -348,7 +348,7 @@ class CarNet:
         
         residual_block12 = encoder.get_layer('block_12_project_BN').output
         residual_block5 = encoder.get_layer('block_5_project_BN').output
-        segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 5
+        segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 12
         
         lane_seg_decoder = self.build_lane_detection(segmentation_head, residual_block5, alpha=self._alpha)
         drive_seg_decoder =  self.build_drivable_detection(segmentation_head, residual_block5, alpha=self._alpha) 
