@@ -3,7 +3,7 @@ import datetime
 import zipfile
 from data import Dataset
 from tools.modes import OPT, BACKBONE, DATASET_MODE
-from tools.callbacks import MAPCallback
+from tools.callbacks import MAPCallback, TensorBoardImage
 from tools.utils import get_anchors, get_classes,ModelFactory
 import os
 import numpy as np
@@ -43,6 +43,8 @@ def train(FLAGS):
 
     class_names = get_classes(FLAGS['classes_path'])
     num_classes = len(class_names)
+    num_lane = 5
+    num_drive = 3
     anchors = get_anchors(FLAGS['anchors_path'])
     input_shape = FLAGS['input_size']  # multiple of 32, hw
     model_path = FLAGS['model']
@@ -54,27 +56,32 @@ def train(FLAGS):
     train_dataset_callback = Dataset(train_dataset_glob,
                                      batch_size,
                                      anchors,
+                                     num_lane,
+                                     num_drive,
                                      num_classes,
                                      input_shape)
     train_dataset, train_num = train_dataset_callback.build()
     val_dataset_builder = Dataset(val_dataset_glob,
                                   batch_size,
                                   anchors,
+                                  num_lane,
+                                  num_drive,
                                   num_classes,
                                   input_shape,
                                   mode=DATASET_MODE.VALIDATE)
     val_dataset, val_num = val_dataset_builder.build()
-    map_callback = MAPCallback(test_dataset_glob,
-                               input_shape,
-                               anchors,
-                               class_names)
-    logging = tf.keras.callbacks.TensorBoard(write_graph=False,log_dir=log_dir, write_images=True)
+    #map_callback = MAPCallback(test_dataset_glob,
+    #                           input_shape,
+    #                           anchors,
+    #                           class_names)
+    logging = tf.keras.callbacks.TensorBoard(write_graph=True,log_dir=log_dir,batch_size=batch_size, write_images=True)
     checkpoint = tf.keras.callbacks.ModelCheckpoint(os.path.join(
         log_dir, 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5'),
                                                     monitor='val_loss',
                                                     save_weights_only=True,
                                                     save_best_only=True,
                                                     period=3)
+    image_viewer = TensorBoardImage(input_shapes=input_shape, validation_data=val_dataset,glob_path=test_dataset_glob, tag="phase1")
     if tf.version.VERSION.startswith('1.'):
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
@@ -109,8 +116,8 @@ def train(FLAGS):
                                                 weights_path=model_path,
                                                 n_class=num_classes,
                                                 n_anchors=len(anchors)//3,
-                                                n_lane_embedding=4,#5,
-                                                n_drive_embedding=2,#3,
+                                                n_lane_embedding=num_lane,
+                                                n_drive_embedding=num_drive,
                                                 alpha=1.4)
         model = multinet.build(freeze_layers=155)
 
@@ -171,7 +178,7 @@ def train(FLAGS):
             epochs=freeze_step,
             initial_epoch=0,
             steps_per_epoch=max(1, train_num // batch_size),
-            callbacks=[logging, checkpoint],
+            callbacks=[logging, checkpoint, image_viewer],
             validation_data=val_dataset,
             validation_steps=max(1, val_num // batch_size))
         model.save_weights(

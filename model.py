@@ -120,22 +120,22 @@ class CarNet:
             if n_seg_class is None:
                 n_seg_class=self.n_lane_embedding
             with tf.name_scope("lane_seg"):
-
+                
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
                             use_bias=False)(inputs)
                 x_up = tf.keras.layers.BatchNormalization(epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
-
+                size = (x_up.shape[1], x_up.shape[2])
                 # avg pool
                 # TODO: AvgPool2D with such as large value, in effect, result in 1x1 value...
-                # x_mid = AveragePooling2D((49, 49), strides=(16, 20))(middle)
-                x_mid = tf.keras.layers.GlobalAveragePooling2D()(inputs)
-                x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
+                x_mid = tf.keras.layers.AveragePooling2D((49, 49), strides=(16, 20), padding="same")(inputs)
+                #x_mid = tf.keras.layers.GlobalAveragePooling2D()(residual)
+                #x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
                 x_mid = tf.keras.layers.Conv2D(128, (1, 1), padding='same')(x_mid)
                 x_mid = tf.keras.layers.Activation('sigmoid')(x_mid)
-                #x_mid = tf.keras.layers.ResizeImages(output_dim=tf.keras.backend.int_shape(inputs)[1:3])(x_mid)
-                x_mid = tf.image.resize_images(x_mid,size=tf.keras.backend.int_shape(inputs)[1:3])
+                x_mid = tf.keras.layers.UpSampling2D(size=size, interpolation="bilinear")(x_mid)
+                #x_mid = tf.image.resize_images(x_mid,size=tf.keras.backend.int_shape(inputs)[1:3])
 
                 # skip conn
                 x_lo = tf.keras.layers.Conv2D(n_seg_class, (1, 1), padding='same')(residual)
@@ -143,7 +143,7 @@ class CarNet:
                 
                 # merge up and mid
                 x_up_mid_merged = tf.keras.layers.Multiply()([x_up, x_mid])
-                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=2)(x_up_mid_merged)
+                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=4, interpolation="bilinear")(x_up_mid_merged)
                 x_up_mid_merged = tf.keras.layers.Conv2D(n_seg_class, (1, 1),
                                         padding='same')(x_up_mid_merged)
 
@@ -152,7 +152,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    lane_output = tf.keras.layers.UpSampling2D(size=8, name="lane_seg")(x_final)
+                    lane_output = tf.keras.layers.UpSampling2D(size=8, interpolation="bilinear", name="lane_seg")(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
@@ -170,23 +170,23 @@ class CarNet:
                             use_bias=False)(inputs)
                 x_up = tf.keras.layers.BatchNormalization( epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
-
+                size = (x_up.shape[1], x_up.shape[2])
                 # avg pool
                 # TODO: AvgPool2D with such as large value, in effect, result in 1x1 value...
-                # x_mid = AveragePooling2D((49, 49), strides=(16, 20))(middle)
-                x_mid = tf.keras.layers.GlobalAveragePooling2D()(inputs)
-                x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
+                x_mid = tf.keras.layers.AveragePooling2D((49, 49), strides=(16, 20), padding="same")(inputs)
+                #x_mid = tf.keras.layers.GlobalAveragePooling2D()(inputs)
+                #x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
                 x_mid = tf.keras.layers.Conv2D(128, (1, 1), padding='same')(x_mid)
                 x_mid = tf.keras.layers.Activation('sigmoid')(x_mid)
-                #x_mid = tf.keras.layers.UpSampling2D(output_dim=tf.keras.backend.int_shape(inputs)[1:3])(x_mid)
-                x_mid = tf.image.resize_images(x_mid,size=tf.keras.backend.int_shape(inputs)[1:3])
+                x_mid = tf.keras.layers.UpSampling2D(size=size, interpolation="bilinear")(x_mid)
+                #x_mid = tf.image.resize_images(x_mid,size=tf.keras.backend.int_shape(inputs)[1:3])
 
                 # skip conn
                 x_lo = tf.keras.layers.Conv2D(n_seg_class, (1, 1), padding='same')(residual)
 
                 # merge up and mid
                 x_up_mid_merged = tf.keras.layers.Multiply()([x_up, x_mid])
-                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=2)(x_up_mid_merged)
+                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=4, interpolation="bilinear")(x_up_mid_merged)
                 x_up_mid_merged = tf.keras.layers.Conv2D(n_seg_class, (1, 1),
                                         padding='same')(x_up_mid_merged)
 
@@ -195,7 +195,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    drive_output = tf.keras.layers.UpSampling2D(size=8, name="drive_seg")(x_final)
+                    drive_output = tf.keras.layers.UpSampling2D(size=8,interpolation="bilinear", name="drive_seg")(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
@@ -348,10 +348,10 @@ class CarNet:
         
         residual_block12 = encoder.get_layer('block_12_project_BN').output
         residual_block5 = encoder.get_layer('block_5_project_BN').output
-        segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 12
+        #segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 12
         
-        lane_seg_decoder = self.build_lane_detection(segmentation_head, residual_block5, alpha=self._alpha)
-        drive_seg_decoder =  self.build_drivable_detection(segmentation_head, residual_block5, alpha=self._alpha) 
+        lane_seg_decoder = self.build_lane_detection(encoder_output, residual_block5, alpha=self._alpha)
+        drive_seg_decoder =  self.build_drivable_detection(encoder_output, residual_block5, alpha=self._alpha) 
         yolo_decoder = self.build_yolo_body(  encoder_output, residual_block5, residual_block12,self.n_anchors, self.n_class, alpha=self._alpha)
         #TODO implement tiny yolo as a detector head
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
@@ -372,8 +372,8 @@ if __name__ == '__main__':
     """
     test code
     """
-    test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')
-    model = CarNet(inputs=None,n_class=11,n_anchors=7, n_lane_embedding=4, n_drive_embedding=2, alpha=1.4)
+    test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 256, 512, 3), name='input')
+    model = CarNet(inputs=None,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
         ret,

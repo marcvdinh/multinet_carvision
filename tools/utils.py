@@ -23,6 +23,7 @@ def letterbox_image(image, size):
     elif len(image.shape) == 3:
         iw, ih = tf.cast(tf.shape(image)[1],
                          tf.int32), tf.cast(tf.shape(image)[0], tf.int32)
+    
     w, h = tf.cast(size[1], tf.int32), tf.cast(size[0], tf.int32)
     nh = tf.cast(tf.cast(ih, tf.float64) * tf.minimum(w / iw, h / ih), tf.int32)
     nw = tf.cast(tf.cast(iw, tf.float64) * tf.minimum(w / iw, h / ih), tf.int32)
@@ -31,9 +32,9 @@ def letterbox_image(image, size):
 
     resized_image = tf.image.resize(image, [nh, nw])
     new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
-    image_color_padded = tf.cast(tf.equal(new_image, 0),
-                                 tf.float32) * (128 / 255)
-    return image_color_padded + new_image, tf.shape(resized_image)
+    #image_color_padded = tf.cast(tf.equal(new_image, 0),
+    #                             tf.float32) * (128 / 255)
+    return new_image, tf.shape(resized_image)
 
 
 def random_gamma(image, min, max):
@@ -95,7 +96,7 @@ def get_random_data(image,
                     cont=.1,
                     noise=0,
                     max_boxes=20,
-                    min_jpeg_quality=80,
+                    min_jpeg_quality=70,
                     max_jpeg_quality=100,
                     train: bool = True):
     '''random preprocessing for real-time data augmentation'''
@@ -103,23 +104,21 @@ def get_random_data(image,
                      tf.float32), tf.cast(tf.shape(image)[0], tf.float32)
     w, h = tf.cast(input_shape[1], tf.float32), tf.cast(input_shape[0],
                                                         tf.float32)
+
+    #iw, ih = tf.cast(1280, tf.float32), tf.cast(720, tf.float32)
+    #w, h = tf.cast(512, tf.float32), tf.cast(256, tf.float32)
     xmaxs = tf.expand_dims(xmaxs, 0)
     xmins = tf.expand_dims(xmins, 0)
     ymaxs = tf.expand_dims(ymaxs, 0)
     ymins = tf.expand_dims(ymins, 0)
     labels = tf.expand_dims(labels, 0)
     if train:
-        new_ar = (w / h) * (tf.random.uniform([], 1 - jitter, 1 + jitter) /
-                            tf.random.uniform([], 1 - jitter, 1 + jitter))
+        new_ar = (w / h) * tf.random.uniform([], 1 - jitter, 1 + jitter) 
         scale = tf.random.uniform([], min_scale, max_scale)
-        ratio = tf.cond(tf.less(
-            new_ar, 1), lambda: scale * new_ar, lambda: scale / new_ar)
-        ratio = tf.maximum(ratio, 1)
-        nw, nh = tf.cond(tf.less(
-            new_ar,
-            1), lambda: (ratio * h, scale * h), lambda: (scale * w, ratio * w))
-        dx = tf.random.uniform([], 0, w - nw)
-        dy = tf.random.uniform([], 0, h - nh)
+        nw = tf.floor(scale * new_ar * h)
+        nh = tf.floor(scale * w / new_ar)
+        dx = tf.floor(tf.random.uniform([], 0, w - nw))
+        dy = tf.floor(tf.random.uniform([], 0, h - nh))
         image = tf.image.resize(image,
                                 [tf.cast(nh, tf.int32),
                                  tf.cast(nw, tf.int32)])
@@ -130,38 +129,40 @@ def get_random_data(image,
                                 [tf.cast(nh, tf.int32),
                                  tf.cast(nw, tf.int32)])
         def crop_and_pad(image, dx, dy):
-            dy = tf.cast(tf.math.maximum(-dy, 0), tf.int32)
-            dx = tf.cast(tf.math.maximum(-dx, 0), tf.int32)
+            dy_t = tf.cast(tf.math.maximum(-dy, 0), tf.int32)
+            dx_t = tf.cast(tf.math.maximum(-dx, 0), tf.int32)
             image = tf.image.crop_to_bounding_box(
-                image, dy, dx,
+                image, dy_t, dx_t,
                 tf.math.minimum(tf.cast(h, tf.int32), tf.cast(nh, tf.int32)),
                 tf.math.minimum(tf.cast(w, tf.int32), tf.cast(nw, tf.int32)))
-            image = tf.image.pad_to_bounding_box(image, 0, 0,
+            image = tf.image.pad_to_bounding_box(image,
+                                                 tf.cast(tf.math.maximum(dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                                  tf.cast(h, tf.int32),
                                                  tf.cast(w, tf.int32))
             return image
 
         new_image = tf.cond(
-            tf.greater(scale,
-                       1), lambda: crop_and_pad(image, dx, dy), lambda: tf.image
+            tf.logical_or(nw > w, nh > h),
+            lambda: crop_and_pad(image, dx, dy), lambda: tf.image
             .pad_to_bounding_box(image, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
+        new_image = crop_and_pad(image, dx, dy)
         image_color_padded = tf.cast(tf.equal(new_image, 0),
                                      tf.float32) * (128 / 255)
         image = image_color_padded + new_image
 
         new_lane_label = tf.cond(
-            tf.greater(scale,
-                       1), lambda: crop_and_pad(lane_label, dx, dy), lambda: tf.image
+            tf.logical_or(nw > w, nh > h),
+            lambda: crop_and_pad(lane_label, dx, dy), lambda: tf.image
             .pad_to_bounding_box(lane_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
         #lane_label = tf.cast(tf.equal(new_lane_label,0), tf.float32)
         lane_label = new_lane_label
         new_drive_label = tf.cond(
-            tf.greater(scale,
-                       1), lambda: crop_and_pad(drive_label, dx, dy), lambda: tf.image
+           tf.logical_or(nw > w, nh > h),
+            lambda: crop_and_pad(drive_label, dx, dy), lambda: tf.image
             .pad_to_bounding_box(drive_label, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
@@ -178,7 +179,7 @@ def get_random_data(image,
                 tf.less(
                     tf.random.uniform([]),
                     0.5), lambda: (tf.image.flip_left_right(image),tf.image.flip_left_right(lane_label), tf.image.flip_left_right(drive_label), w - xmaxs, w
-                                   - xmins), lambda: (image,lane_label, drive_label, xmins, xmaxs))
+                                   - xmins), lambda: (image, lane_label, drive_label, xmins, xmaxs))
         if hue > 0:
             image = tf.image.random_hue(image, hue)
         if sat > 1:
@@ -194,7 +195,7 @@ def get_random_data(image,
                                                  max_jpeg_quality)
         if noise > 0:
             image = image + tf.cast(
-                tf.random.uniform(shape=[input_shape[1], input_shape[0], 3],
+                tf.random.uniform(shape=[input_shape[0], input_shape[1], 3],
                                   minval=0,
                                   maxval=noise), tf.float32)
         if blur:
@@ -331,18 +332,15 @@ def expand_seg_label(label, Ncl, label_type):
     uncompress a grayscale mask into n-dimension groundtruth with n the number of classes
     """
     #TODO replace hard coded values
+    w,h = tf.cast(tf.shape(label)[1],
+                     tf.int32), tf.cast(tf.shape(label)[0], tf.int32)
     label = tf.tile( label, [1, 1, Ncl])
-    #tf.print(tf.shape(label))
-    #masks = tf.zeros([224, 224, Ncl], tf.float32)
-    #masks = tf.cond( tf.cast(label_type == "lane", tf.bool),
-    #    lambda: tf.cast(tf.equal(label, lane_classes), tf.float32),
-    #    lambda: tf.cast(tf.equal(label, drive_classes), tf.float32))
     if label_type == "lane":
-        lane_classes = tf.broadcast_to( tf.constant([120,170,220,255], dtype=tf.uint8, name="lane_levels"), [720,1280,Ncl])
+        lane_classes = tf.broadcast_to( tf.constant([0,120,170,220,255], dtype=tf.uint8, name="lane_levels"), [h,w,Ncl])
         #tf.print(tf.shape(lane_classes))
         masks = tf.cast(tf.equal(label, lane_classes), tf.float32)
     else:
-        drive_classes = tf.broadcast_to(tf.constant([1,2], dtype=tf.uint8, name="drive_levels"), [720, 1280, Ncl])
+        drive_classes = tf.broadcast_to(tf.constant([0,1,2], dtype=tf.uint8, name="drive_levels"), [h, w, Ncl])
         #tf.print(tf.shape(drive_classes))
         masks = tf.cast(tf.equal(label, drive_classes), tf.float32)
     #tf.print(masks)

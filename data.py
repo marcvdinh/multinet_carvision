@@ -43,17 +43,17 @@ class Dataset(tf.keras.callbacks.Callback):
                                       channels=1,
                                       dtype=tf.uint8
                                       ),
-                                      4, 
+                                      self.num_lane, 
                                       "lane")
-        lane.set_shape([None, None, 4])
+        lane.set_shape([None, None, self.num_lane])
         
         drive = expand_seg_label(tf.image.decode_image(features['image/drive'],
                                       channels=1,
                                       dtype=tf.uint8
                                       ),
-                                      2,
+                                      self.num_drive,
                                       "drive") 
-        drive.set_shape([None, None, 2])
+        drive.set_shape([None, None, self.num_drive])
 
         xmins = features['image/object/bbox/xmin'].values
         xmaxs = features['image/object/bbox/xmax'].values
@@ -87,12 +87,12 @@ class Dataset(tf.keras.callbacks.Callback):
             #train_num = reduce(
             #    lambda x, y: x + y,
             #    map(lambda file: int(self._get_num_from_name(file)), files))
-            train_num = 1000
+            train_num = 100
             dataset = dataset.shuffle(train_num).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
-            dataset = dataset.shuffle(1000).map(
+            dataset = dataset.shuffle(100).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.TEST:
@@ -105,6 +105,8 @@ class Dataset(tf.keras.callbacks.Callback):
                  glob_path: str,
                  batch_size: int,
                  anchors=None,
+                 num_lane=None,
+                 num_drive=None,
                  num_classes=None,
                  input_shapes=None,
                  mode=DATASET_MODE.TRAIN):
@@ -119,6 +121,8 @@ class Dataset(tf.keras.callbacks.Callback):
             self.input_shape = input_shapes
         self.anchors = anchors
         self.num_classes = num_classes
+        self.num_lane = num_lane
+        self.num_drive = num_drive
         self.mode = mode
 
     def _get_num_from_name(self, name):
@@ -134,7 +138,7 @@ class Dataset(tf.keras.callbacks.Callback):
             #TODO fix num
             num = reduce(lambda x, y: x + y,
                          map(lambda file: self._get_num_from_name(file), files))
-            num = 1000
+            num = 100
         except Exception:
             raise ValueError(
                 'Please format file name like <name>_<number>.<extension>')
