@@ -1,34 +1,135 @@
 import tensorflow as tf
 import numpy as np
 from loss import yolo_eval
-from tools.utils import letterbox_image, bind
+from tools.utils import letterbox_image, bind, expand_seg_label
 from timeit import default_timer as timer
 from data import Dataset
 from tools.modes import DATASET_MODE
-
+import io
+#from sklearn import skimage
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-#TODO implement MIOU
+#TODO implement MIOU for segmentation
 
 #TODO implement tensorboard image display
 class TensorBoardImage(tf.keras.callbacks.Callback):
-    def __init__(self, tag):
+    def __init__(self,
+                input_shapes,
+                validation_data,
+                glob_path,
+                tag,
+                batch_size = 1):
         super().__init__() 
-        self.tag = tag
+       
+        if isinstance(input_shapes, list):
+            self.input_shapes = input_shapes
+            self.input_shape = tf.Variable(name="input_shape",
+                                           initial_value=self.input_shapes,
+                                           trainable=False)
+        else:
+            self.input_shape = input_shapes
+        self.val_data = validation_data
+        self.glob_path = glob_path
+        self.tag = tag   
+        self.batch_size = batch_size
+    
+    def parse_tfrecord(self, example_proto):
+        feature_description = {
+            'image/filename': tf.io.FixedLenFeature([], tf.string),
+            'image/encoded': tf.io.FixedLenFeature([], tf.string),
+            'image/lane': tf.io.FixedLenFeature([], tf.string),
+            'image/drive': tf.io.FixedLenFeature([], tf.string),
+            'image/object/bbox/xmin': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/xmax': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/ymin': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/ymax': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/label': tf.io.VarLenFeature(tf.int64)
+        }
+        features = tf.io.parse_single_example(example_proto,
+                                              feature_description)
+        filename = tf.compat.as_str_any(features['image/filename'])
+        
+        image = tf.image.decode_image(features['image/encoded'],
+                                      channels=3,
+                                      dtype=tf.float32)
+        lane = tf.image.decode_image(features['image/lane'],
+                                      channels=1,
+                                      dtype=tf.uint8
+                                      )
+        drive = tf.image.decode_image(features['image/drive'],
+                                      channels=1,
+                                      dtype=tf.uint8
+                                      )
+        #lane = expand_seg_label(tf.image.decode_image(features['image/lane'],
+        #                              channels=1,
+        #                              dtype=tf.uint8
+        #                              ),
+        #                              5, 
+        #                              "lane")
+        #lane.set_shape([None, None, 5])
+        
+        #drive = expand_seg_label(tf.image.decode_image(features['image/drive'],
+        #                              channels=1,
+        #                              dtype=tf.uint8
+        #                              ),
+        #                              3,
+        #                              "drive") 
+        #drive.set_shape([None, None, 3])
+        return image, lane, drive
+
+    def create_image(self, tensor):
+        height, width, channel = tensor.shape
+        image = tf.keras.preprocessing.image.array_to_img(tensor)
+        output = io.BytesIO()
+        image.save(output, format='PNG')
+        image_string = output.getvalue()
+        output.close()
+        return tf.Summary.Image(height=height,
+                         width=width,
+                         colorspace=channel,
+                         encoded_image_string=image_string)
+
+    def create_mask(self,pred_mask):
+        pred_mask = tf.argmax(pred_mask, axis=-1)
+        pred_mask = pred_mask[..., tf.newaxis]
+        return tf.cast(pred_mask, tf.float32)
 
     def on_epoch_end(self, epoch, logs={}):
-        # Load image
-        img = data.astronaut()
-        # Do something to the image
-        img = (255 * skimage.util.random_noise(img)).astype('uint8')
 
-        image = make_image(img)
-        summary = tf.Summary(value=[tf.Summary.Value(tag=self.tag, image=image)])
-        writer = tf.summary.FileWriter('./logs')
-        writer.add_summary(summary, epoch)
-        writer.close()
+        test_dataset_builder = Dataset(self.glob_path,
+                                       self.batch_size,
+                                       input_shapes=self.input_shape,
+                                       mode=DATASET_MODE.TEST)
+        bind(test_dataset_builder, self.parse_tfrecord)
+        test_dataset, test_num = test_dataset_builder.build()
+        
+        for image, lane, drive in test_dataset:
+            if self.input_shape != (None, None):
+                boxed_image, resized_image_shape = letterbox_image(
+                    image, self.input_shape)
+                boxed_lane, _ = letterbox_image(
+                   lane, self.input_shape)
+                boxed_drive, _ = letterbox_image(
+                    drive, self.input_shape)
+                
+            else:
+                _, height, width, _ = tf.shape(image)
+                new_image_size = (height - (height % 32), width - (width % 32))
+                boxed_image, resized_image_shape = letterbox_image(
+                    image, new_image_size)
+            output = self.model.predict(boxed_image.numpy()) 
 
+        pred_lane_mask = self.create_mask(output[0])
+        pred_drive_mask = self.create_mask(output[1])
+        writer = tf.contrib.summary.create_file_writer('./tboard')
+        with writer.as_default(), tf.contrib.summary.always_record_summaries():
+            tf.contrib.summary.image("input image", boxed_image)
+            tf.contrib.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask],0))
+            tf.contrib.summary.image("drive segmentation", tf.concat([boxed_drive, pred_drive_mask],0))
         return
+#TODO implement confusion matrix for object detection
+#class ConfusionMatrixCallback(tf.keras.callbacks.Callback):
+    
         
 class MAPCallback(tf.keras.callbacks.Callback):
     """

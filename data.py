@@ -14,11 +14,6 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 class Dataset(tf.keras.callbacks.Callback):
 
-    def on_batch_end(self, batch, logs=None):
-        if hasattr(self, 'input_shapes'):
-            index = math.floor(random() * len(self.input_shapes))
-            self.input_shape.assign(self.input_shapes[index])
-
     def parse_tfrecord(self, example_proto):
         feature_description = {
             'image/filename': tf.io.FixedLenFeature([], tf.string),
@@ -87,12 +82,12 @@ class Dataset(tf.keras.callbacks.Callback):
             #train_num = reduce(
             #    lambda x, y: x + y,
             #    map(lambda file: int(self._get_num_from_name(file)), files))
-            train_num = 100
+            train_num = 90000
             dataset = dataset.shuffle(train_num).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
-            dataset = dataset.shuffle(100).map(
+            dataset = dataset.shuffle(10000).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.TEST:
@@ -138,7 +133,7 @@ class Dataset(tf.keras.callbacks.Callback):
             #TODO fix num
             num = reduce(lambda x, y: x + y,
                          map(lambda file: self._get_num_from_name(file), files))
-            num = 100
+            num = 100000
         except Exception:
             raise ValueError(
                 'Please format file name like <name>_<number>.<extension>')
@@ -147,8 +142,8 @@ class Dataset(tf.keras.callbacks.Callback):
             txts=list(filter(lambda file: file.endswith('.txt'), files))
             if len(tfrecords)>0:
                 tfrecords_dataset=self._dataset_internal(tfrecords,tf.data.TFRecordDataset, self.parse_tfrecord)
-            if len(txts) > 0:
-                txts_dataset=self._dataset_internal(txts,tf.data.TextLineDataset,self.parse_text)
+            #if len(txts) > 0:
+            #    txts_dataset=self._dataset_internal(txts,tf.data.TextLineDataset,self.parse_text)
             if len(tfrecords)>0 and len(txts) > 0:
                 return tfrecords_dataset.concatenate(txts_dataset),num
             elif len(tfrecords)>0:
