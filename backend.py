@@ -18,7 +18,7 @@ from typing import List, Tuple
 from tensorflow_serving.apis import prediction_log_pb2, predict_pb2
 from tensorflow.python import debug as tf_debug
 from functools import partial
-
+#from model import build_yolo_body
 tf.keras.backend.set_learning_phase(0)
 
 
@@ -77,19 +77,19 @@ class YOLO(object):
             model = tf.keras.models.load_model(model_path, compile=False)
         except:
             if self.backbone == BACKBONE.MOBILENETV2:
-                model_body = partial(mobilenetv2_yolo_body,
+                model_body = partial(build_yolo_body,
                                      alpha=FLAGS['alpha'])
-            elif self.backbone == BACKBONE.DARKNET53:
-                model_body = darknet_yolo_body
-            elif self.backbone == BACKBONE.EFFICIENTNET:
-                model_body = partial(efficientnet_yolo_body,
-                                     model_name='efficientnet-b4',
-                                     num_anchors=num_anchors // 3,
-                                     batch_norm_momentum=0.9,
-                                     batch_norm_epsilon=1e-3,
-                                     num_classes=num_classes,
-                                     drop_connect_rate=0.2,
-                                     data_format="channels_first")
+            #elif self.backbone == BACKBONE.DARKNET53:
+            #    model_body = darknet_yolo_body
+            #elif self.backbone == BACKBONE.EFFICIENTNET:
+            #    model_body = partial(efficientnet_yolo_body,
+            #                         model_name='efficientnet-b4',
+            #                         num_anchors=num_anchors // 3,
+            #                         batch_norm_momentum=0.9,
+            #                         batch_norm_epsilon=1e-3,
+            #                         num_classes=num_classes,
+            #                         drop_connect_rate=0.2,
+            #                         data_format="channels_first")
             if tf.executing_eagerly():
                 input = tf.keras.layers.Input(shape=(*self.input_shape, 3),
                                               name='predict_image')

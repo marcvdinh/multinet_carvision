@@ -82,12 +82,12 @@ class Dataset(tf.keras.callbacks.Callback):
             #train_num = reduce(
             #    lambda x, y: x + y,
             #    map(lambda file: int(self._get_num_from_name(file)), files))
-            train_num = 90000
+            train_num = 100
             dataset = dataset.shuffle(train_num).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
-            dataset = dataset.shuffle(10000).map(
+            dataset = dataset.shuffle(100).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.TEST:
@@ -133,7 +133,7 @@ class Dataset(tf.keras.callbacks.Callback):
             #TODO fix num
             num = reduce(lambda x, y: x + y,
                          map(lambda file: self._get_num_from_name(file), files))
-            num = 100000
+            num = 100
         except Exception:
             raise ValueError(
                 'Please format file name like <name>_<number>.<extension>')

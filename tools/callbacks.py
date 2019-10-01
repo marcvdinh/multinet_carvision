@@ -1,26 +1,30 @@
 import tensorflow as tf
 import numpy as np
 from loss import yolo_eval
-from tools.utils import letterbox_image, bind, expand_seg_label
+from tools.utils import letterbox_image, bind, expand_seg_label, get_classes,get_anchors
 from timeit import default_timer as timer
 from data import Dataset
 from tools.modes import DATASET_MODE
 import io
+from PIL import Image, ImageFont, ImageDraw
 #from sklearn import skimage
+import colorsys
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 #TODO implement MIOU for segmentation
 
-#TODO implement tensorboard image display
+#FIXME access to validation dataset at epoch end so that we avoid creating a new test dataset each time.
 class TensorBoardImage(tf.keras.callbacks.Callback):
     def __init__(self,
                 input_shapes,
+                anchors,
+                class_names,
                 validation_data,
                 glob_path,
                 tag,
                 batch_size = 1):
         super().__init__() 
-       
+        
         if isinstance(input_shapes, list):
             self.input_shapes = input_shapes
             self.input_shape = tf.Variable(name="input_shape",
@@ -30,9 +34,23 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
             self.input_shape = input_shapes
         self.val_data = validation_data
         self.glob_path = glob_path
-        self.tag = tag   
+        self.tag = tag 
         self.batch_size = batch_size
-    
+        self.anchors = anchors
+        self.class_names = class_names
+        hsv_tuples = [
+            (x / len(self.class_names), 1., 1.)
+            for x in range(len(self.class_names))
+        ]
+        self.colors = list(
+            map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+        self.colors = list(
+            map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
+                self.colors))
+        np.random.seed(10101)  # Fixed seed for consistent colors across runs.
+        np.random.shuffle(
+            self.colors)  # Shuffle colors to decorrelate
+
     def parse_tfrecord(self, example_proto):
         feature_description = {
             'image/filename': tf.io.FixedLenFeature([], tf.string),
@@ -60,21 +78,6 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
                                       channels=1,
                                       dtype=tf.uint8
                                       )
-        #lane = expand_seg_label(tf.image.decode_image(features['image/lane'],
-        #                              channels=1,
-        #                              dtype=tf.uint8
-        #                              ),
-        #                              5, 
-        #                              "lane")
-        #lane.set_shape([None, None, 5])
-        
-        #drive = expand_seg_label(tf.image.decode_image(features['image/drive'],
-        #                              channels=1,
-        #                              dtype=tf.uint8
-        #                              ),
-        #                              3,
-        #                              "drive") 
-        #drive.set_shape([None, None, 3])
         return image, lane, drive
 
     def create_image(self, tensor):
@@ -103,7 +106,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
         bind(test_dataset_builder, self.parse_tfrecord)
         test_dataset, test_num = test_dataset_builder.build()
         
-        for image, lane, drive in test_dataset:
+        for image, lane, drive in test_dataset.take(1):
             if self.input_shape != (None, None):
                 boxed_image, resized_image_shape = letterbox_image(
                     image, self.input_shape)
@@ -117,15 +120,62 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
                 new_image_size = (height - (height % 32), width - (width % 32))
                 boxed_image, resized_image_shape = letterbox_image(
                     image, new_image_size)
-            output = self.model.predict(boxed_image.numpy()) 
+            image_data = np.array(boxed_image)
+            output = self.model.predict(image_data)
+            image_shape = tf.shape(image)[1:3]
+            image_detect = Image.fromarray((np.array(tf.squeeze(image)) * 255).astype('uint8'),
+                                    'RGB')
+        out_boxes, out_scores, out_classes = yolo_eval(
+                [output[2], output[3], output[4]],
+                self.anchors,
+                len(self.class_names),
+                image_shape,
+                score_threshold=0.2,
+                iou_threshold=0.5)
+        
+        
+        font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
+                                      size=np.floor(3e-2 * image_detect.size[1] +
+                                                    0.5).astype('int32'))
+        thickness = (image_detect.size[1] + image_detect.size[0]) // 300
+        draw = ImageDraw.Draw(image_detect)
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            box = out_boxes[i]
+            score = out_scores[i]
 
+            label = '{} {:.2f}'.format(predicted_class, score)
+
+            label_size = draw.textsize(label, font)
+
+            top, left, bottom, right = box
+            #print(label, (left, top), (right, bottom))
+
+            if top - label_size[1] >= 0:
+                text_origin = np.array([left, top - label_size[1]])
+            else:
+                text_origin = np.array([left, top + 1])
+
+            # My kingdom for a good redistributable image drawing library.
+            for i in range(thickness):
+                draw.rectangle([left + i, top + i, right - i, bottom - i],
+                                   outline=self.colors[c])
+                draw.rectangle(
+                    [tuple(text_origin),
+                     tuple(text_origin + label_size)],
+                    fill=self.colors[c])
+                draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+        del draw
+        #image_detect.show()
+        yolo_output = tf.expand_dims(tf.keras.preprocessing.image.img_to_array(image_detect), 0)
         pred_lane_mask = self.create_mask(output[0])
         pred_drive_mask = self.create_mask(output[1])
         writer = tf.contrib.summary.create_file_writer('./tboard')
         with writer.as_default(), tf.contrib.summary.always_record_summaries():
-            tf.contrib.summary.image("input image", boxed_image)
+            tf.contrib.summary.image("image input", boxed_image)
             tf.contrib.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask],0))
             tf.contrib.summary.image("drive segmentation", tf.concat([boxed_drive, pred_drive_mask],0))
+            tf.contrib.summary.image("yolo output", yolo_output)
         return
 #TODO implement confusion matrix for object detection
 #class ConfusionMatrixCallback(tf.keras.callbacks.Callback):

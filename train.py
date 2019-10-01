@@ -81,7 +81,7 @@ def train(FLAGS):
                                                     save_weights_only=True,
                                                     save_best_only=True,
                                                     period=3)
-    image_viewer = TensorBoardImage(input_shapes=input_shape, validation_data=val_dataset,glob_path=test_dataset_glob, tag="phase1")
+    image_viewer = TensorBoardImage(input_shapes=input_shape, anchors=anchors,class_names = class_names, validation_data=val_dataset,glob_path=test_dataset_glob, tag="phase1")
     if tf.version.VERSION.startswith('1.'):
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
@@ -200,7 +200,29 @@ def train(FLAGS):
                            initial_epoch=freeze_step,
                            steps_per_epoch=max(1, train_num // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, early_stopping #TODO fix logging and mapcallback
+                               checkpoint, cos_lr, early_stopping, image_viewer #TODO fix logging and mapcallback
+                           ],
+                           validation_data=val_dataset,
+                           validation_steps=max(1, val_num // batch_size))
+        model.save_weights(
+            os.path.join(
+                log_dir,
+                str(backbone).split('.')[1].lower() +
+                '_trained_weights_stage_2.h5'))
+
+    if False:
+        for i in range(50, len(model.layers)):
+            model.layers[i].trainable = True
+        with strategy.scope():
+            model.compile(optimizer=tf.keras.optimizers.Adam(lr[1],epsilon=1e-8),
+                               loss=losses)  # recompile to apply the change
+        print('finetune at layer 50.')
+        model.fit(train_dataset,
+                           epochs=train_step + freeze_step,
+                           initial_epoch= freeze_step,
+                           steps_per_epoch=max(1, train_num // batch_size),
+                           callbacks=[
+                               checkpoint, cos_lr, early_stopping, image_viewer #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))
@@ -209,3 +231,4 @@ def train(FLAGS):
                 log_dir,
                 str(backbone).split('.')[1].lower() +
                 '_trained_weights_finetuned.h5'))
+
