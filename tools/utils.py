@@ -332,11 +332,12 @@ def expand_seg_label(label, Ncl, label_type):
     uncompress a grayscale mask into n-dimension groundtruth with n the number of classes
     """
     #TODO replace hard coded values
+    # lane classes [0,120,170,220,255]
     w,h = tf.cast(tf.shape(label)[1],
                      tf.int32), tf.cast(tf.shape(label)[0], tf.int32)
     label = tf.tile( label, [1, 1, Ncl])
     if label_type == "lane":
-        lane_classes = tf.broadcast_to( tf.constant([0,120,170,220,255], dtype=tf.uint8, name="lane_levels"), [h,w,Ncl])
+        lane_classes = tf.broadcast_to( tf.constant([0,255], dtype=tf.uint8, name="lane_levels"), [h,w,Ncl])
         #tf.print(tf.shape(lane_classes))
         masks = tf.cast(tf.equal(label, lane_classes), tf.float32)
     else:
