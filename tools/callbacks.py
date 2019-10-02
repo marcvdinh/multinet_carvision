@@ -86,7 +86,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
         ymaxs = features['image/object/bbox/ymax'].values
         labels = features['image/object/bbox/label'].values
 
-        gt_boxes =tf.stack([ymins, xmins, ymaxs, xmaxs], 1)
+        gt_boxes = tf.stack([ymins, xmins, ymaxs, xmaxs], 1)
         return image, lane, drive, gt_boxes, labels
 
     def create_mask(self,pred_mask):
@@ -112,15 +112,13 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
             boxed_drive, _ = letterbox_image(
                     drive, self.input_shape)
             gt_boxes = tf.squeeze(boxes)
-            box_labels = labels   
+            box_labels = labels
 
             image_data = np.array(boxed_image)
             output = self.model.predict(image_data)
             image_shape = tf.shape(image)[1:3]
-            image_detect = Image.fromarray((np.array(tf.squeeze(image)) * 255).astype('uint8'),
-                                    'RGB')
-            image_detect_gt = Image.fromarray((np.array(tf.squeeze(image)) * 255).astype('uint8'),
-                                    'RGB')
+            image_detect = tf.keras.preprocessing.image.array_to_img(tf.squeeze(image))
+            image_detect_gt = tf.keras.preprocessing.image.array_to_img(tf.squeeze(image))
         out_boxes, out_scores, out_classes = yolo_eval(
                 [output[2], output[3], output[4]],
                 self.anchors,
@@ -135,7 +133,6 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
                                                     0.5).astype('int32'))
         thickness = (image_detect.size[1] + image_detect.size[0]) // 300
         draw = ImageDraw.Draw(image_detect)
-       
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
@@ -185,7 +182,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
                 draw_gt.rectangle([left + i, top + i, right - i, bottom - i],
-                                   outline=self.colors[c-1])
+                                   outline=self.colors[c])
                 draw_gt.rectangle(
                     [tuple(text_origin),
                      tuple(text_origin + label_size)],
@@ -193,16 +190,17 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
                 draw_gt.text(text_origin, label, fill=(0, 0, 0), font=font)
         del draw_gt
         #image_detect_gt.show()
-        yolo_output = tf.keras.preprocessing.image.img_to_array(image_detect)
-        yolo_gt =tf.keras.preprocessing.image.img_to_array(image_detect_gt)
+        #image_detect.show()
+        yolo_output = tf.expand_dims(tf.convert_to_tensor(np.array(image_detect)), 0)
+        yolo_gt = tf.expand_dims(tf.convert_to_tensor(np.array(image_detect_gt)), 0)
         pred_lane_mask = self.create_mask(output[0])
         pred_drive_mask = self.create_mask(output[1])
         writer = tf.summary.create_file_writer('./tboard')
         with writer.as_default():
-            #tf.summary.image("image input", boxed_image, epoch)
-            tf.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask],0), epoch)
-            tf.summary.image("drive segmentation", tf.concat([boxed_drive, pred_drive_mask],0), epoch)
-            tf.summary.image("yolo output", tf.stack([yolo_gt, yolo_output], 0), epoch)
+            tf.summary.image("image input", boxed_image, epoch)
+            tf.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask], 0), epoch)
+            tf.summary.image("drive segmentation", tf.concat([boxed_drive, pred_drive_mask], 0), epoch)
+            tf.summary.image("yolo output", tf.concat([yolo_gt, yolo_output], 0), epoch)
         return
 #TODO implement confusion matrix for object detection
 #class ConfusionMatrixCallback(tf.keras.callbacks.Callback):
