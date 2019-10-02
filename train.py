@@ -4,10 +4,10 @@ import zipfile
 from data import Dataset
 from tools.modes import OPT, BACKBONE, DATASET_MODE
 from tools.callbacks import MAPCallback, TensorBoardImage
-from tools.utils import get_anchors, get_classes,ModelFactory
+from tools.utils import get_anchors, get_classes, ModelFactory
 import os
 import numpy as np
-from tensorflow.python import debug as tf_debug
+#from tensorflow.python import debug as tf_debug
 from loss import YoloLoss, laneSegLoss, driveSegLoss
 from model import CarNet
 
@@ -43,7 +43,7 @@ def train(FLAGS):
 
     class_names = get_classes(FLAGS['classes_path'])
     num_classes = len(class_names)
-    num_lane = 5
+    num_lane = 2
     num_drive = 3
     anchors = get_anchors(FLAGS['anchors_path'])
     input_shape = FLAGS['input_size']  # multiple of 32, hw
@@ -97,19 +97,27 @@ def train(FLAGS):
         verbose=1)
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
-    if tf.version.VERSION.startswith('1.'):
-        yolo_loss_1 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 0, anchors, print_loss=False)           
-        yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
-        yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
+    
+    yolo_loss_1 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 0, anchors, print_loss=False)           
+    yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
+    yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
         
-        lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
-        drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
-        losses = [lane_loss , drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
+    lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
+    drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
+    losses = [lane_loss , drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
 
         #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}
-    else:
-        #TODO segmentation loss
-        loss = [YoloLoss(idx, anchors, print_loss=False) for idx in range(3)]
+    #else:
+    #    #TODO segmentation loss
+    #    #loss = [YoloLoss(idx, anchors, print_loss=False) for idx in range(3)]
+    #    yolo_loss_1 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 0, anchors, print_loss=False)           
+    #    yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
+    #    yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
+        
+    #    lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
+    #    drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
+    #    losses = [lane_loss , drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
+
 
     with strategy.scope():
         multinet = CarNet(tf.keras.layers.Input(shape=(*input_shape,3)),

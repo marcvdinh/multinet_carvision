@@ -26,13 +26,13 @@ flags.DEFINE_integer('batch_size',
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[10, 10],
+                           default=[40, 20],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
 flags.DEFINE_string('export', default='export_model/8', help="Export path")
 flags.DEFINE_string('input', default=None, help="Input data for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(224, 224),
+                           default=(256, 512),
                            lower_bound=0,
                            help="Input size")
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
@@ -53,10 +53,10 @@ flags.DEFINE_string('train_dataset',
                     default='data/train/*.tfrecords',
                     help="Dataset glob for train")
 flags.DEFINE_string('val_dataset',
-                    default='data/eval/*.tfrecords',
+                    default='data/train/*.tfrecords',
                     help="Dataset glob for validate")
 flags.DEFINE_string('test_dataset',
-                    default='data/eval/*.tfrecords',
+                    default='data/train/*.tfrecords',
                     help="Dataset glob for test")
 flags.DEFINE_string('anchors_path',
                     default='config/yolo_anchors.txt',

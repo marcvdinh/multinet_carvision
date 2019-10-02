@@ -1,5 +1,6 @@
 traffic sign
 traffic lig: green
+traffic lig: yellow
 traffic lig: red
 traffic lig: none
 car
