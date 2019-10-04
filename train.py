@@ -120,14 +120,15 @@ def train(FLAGS):
 
 
     with strategy.scope():
-        multinet = CarNet(tf.keras.layers.Input(shape=(*input_shape,3)),
+        multinet = CarNet(backbone, tf.keras.layers.Input(shape=(*input_shape,3)),
                                                 weights_path=model_path,
                                                 n_class=num_classes,
                                                 n_anchors=len(anchors)//3,
                                                 n_lane_embedding=num_lane,
                                                 n_drive_embedding=num_drive,
                                                 alpha=1.4)
-        model = multinet.build(freeze_layers=155)
+        
+        model = multinet.build()
 
 
     if prune:
@@ -197,7 +198,7 @@ def train(FLAGS):
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
     if True:
-        for i in range(100, len(model.layers)):
+        for i in range(len(model.layers)):
             model.layers[i].trainable = True
         with strategy.scope():
             model.compile(optimizer=tf.keras.optimizers.Adam(lr[1],epsilon=1e-8),

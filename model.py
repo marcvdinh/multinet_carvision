@@ -5,10 +5,11 @@ import tensorflow as tf
 from typing import List, Tuple
 from tools.utils import compose
 from override import mobilenet_v2
-
-
+from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs
+from tools.modes import OPT, BACKBONE
 class CarNet:
-    def __init__(self,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
+    def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
+        self.backbone =  backbone
         self.inputs = inputs
         self.weights_path = weights_path
         self.n_class = n_class
@@ -104,17 +105,131 @@ class CarNet:
             tf.keras.layers.BatchNormalization(fused=True), tf.keras.layers.ReLU(6.))
 
     def build_encoder(self,inputs, alpha=1.0):
-        mobilenetv2 = mobilenet_v2(default_batchnorm_momentum=0.9,
+        inputs_shape = inputs.shape[1::]
+        
+        if self.backbone == BACKBONE.MOBILENETV2:
+            encoder = mobilenet_v2(default_batchnorm_momentum=0.9,
                                 alpha=alpha,
                                 input_tensor=inputs,
                                 include_top=False,
                                 weights='imagenet')
-        #encoder_output = mobilenetv2.output
-        #residual_block5 = mobilenetv2.get_layer('block_5_project_BN').output
-        #residual_block12 = mobilenetv2.get_layer('block_12_project_BN').output
+        elif self.backbone == BACKBONE.EFFICIENTNET:
+            encoder = EfficientNetB4(include_top=False,
+                                        weights='imagenet',
+                                        input_shape=inputs_shape,
+                                        classes= self.n_class,
+                                        input_tensor=inputs)
 
     
-        return  mobilenetv2
+        return  encoder
+
+    def make_last_layers_efficientnet(self,x, block_args, global_params):
+        if global_params.data_format == 'channels_first':
+            channel_axis = 1
+        else:
+            channel_axis = -1
+        num_filters = block_args.input_filters * block_args.expand_ratio
+        x = compose(
+            tf.keras.layers.Conv2D(num_filters,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False),
+            tf.keras.layers.BatchNormalization(
+                axis=channel_axis,
+                epsilon=global_params.batch_norm_epsilon,
+                momentum=global_params.batch_norm_momentum),
+            tf.keras.layers.ReLU(6.),
+            MBConvBlock(block_args,
+                        global_params,
+                        drop_connect_rate=global_params.drop_connect_rate),
+            tf.keras.layers.Conv2D(num_filters,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False),
+            tf.keras.layers.BatchNormalization(
+                axis=channel_axis,
+                epsilon=global_params.batch_norm_epsilon,
+                momentum=global_params.batch_norm_momentum),
+            tf.keras.layers.ReLU(6.),
+            MBConvBlock(block_args,
+                        global_params,
+                        drop_connect_rate=global_params.drop_connect_rate),
+            tf.keras.layers.Conv2D(num_filters,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False),
+            tf.keras.layers.BatchNormalization(
+                axis=channel_axis,
+                epsilon=global_params.batch_norm_epsilon,
+                momentum=global_params.batch_norm_momentum),
+            tf.keras.layers.ReLU(6.))(x)
+        y = compose(
+            MBConvBlock(block_args,
+                        global_params,
+                        drop_connect_rate=global_params.drop_connect_rate),
+            tf.keras.layers.Conv2D(block_args.output_filters,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False))(x)
+        return x, y
+
+    def build_efficientnet_yolo(self,inputs, swish_29, swish_65,
+                                     num_anchors, model_name='efficientnet-b4', **kwargs):
+        _, global_params, input_shape = get_model_params(model_name, kwargs)
+        num_classes = global_params.num_classes
+        if global_params.data_format == 'channels_first':
+            channel_axis = 1
+        else:
+            channel_axis = -1
+        
+        block_args = BlockArgs(kernel_size=3,
+                            num_repeat=1,
+                            input_filters=512,
+                            output_filters=num_anchors * (num_classes + 5),
+                            expand_ratio=1,
+                            id_skip=True,
+                            se_ratio=0.25,
+                            strides=[1, 1])
+        x, y1 = self.make_last_layers_efficientnet(inputs, block_args,
+                                            global_params)
+        x = compose(
+            tf.keras.layers.Conv2D(256,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False,
+                                name='block_20_conv'),
+            tf.keras.layers.BatchNormalization(axis=channel_axis,
+                                            momentum=0.9,
+                                            name='block_20_BN'),
+            tf.keras.layers.ReLU(6., name='block_20_relu6'),
+            tf.keras.layers.UpSampling2D(2))(x)
+        block_args = block_args._replace(input_filters=256)
+        x = tf.keras.layers.Concatenate()(
+            [x, swish_65])
+        x, y2 = self.make_last_layers_efficientnet(x, block_args, global_params)
+        x = compose(
+            tf.keras.layers.Conv2D(128,
+                                kernel_size=1,
+                                padding='same',
+                                use_bias=False,
+                                name='block_24_conv'),
+            tf.keras.layers.BatchNormalization(axis=channel_axis,
+                                            momentum=0.9,
+                                            name='block_24_BN'),
+            tf.keras.layers.ReLU(6., name='block_24_relu6'),
+            tf.keras.layers.UpSampling2D(2))(x)
+        block_args = block_args._replace(input_filters=128)
+        x = tf.keras.layers.Concatenate()(
+            [x, swish_29])
+        x, y3 = self.make_last_layers_efficientnet(x, block_args, global_params)
+        y1 = tf.keras.layers.Reshape(
+            (y1.shape[1], y1.shape[2], num_anchors, num_classes + 5), name='y1')(y1)
+        y2 = tf.keras.layers.Reshape(
+            (y2.shape[1], y2.shape[2], num_anchors, num_classes + 5), name='y2')(y2)
+        y3 = tf.keras.layers.Reshape(
+            (y3.shape[1], y3.shape[2], num_anchors, num_classes + 5), name='y3')(y3)
+        return [y1, y2, y3]
+
 
     def build_lane_detection(self, inputs,residual, n_seg_class=None, alpha=1.0, upsample_output=True, last_layer_name=None):       
             if n_seg_class is None:
@@ -202,7 +317,7 @@ class CarNet:
 
                 return drive_output
 
-    def build_yolo_body(self,inputs, residual_block5, residual_block12,num_anchors, num_classes, alpha=1.0):
+    def build_mobilenet_yolo(self,inputs, residual_block5, residual_block12,num_anchors, num_classes, alpha=1.0):
 
         x, y1 = self.make_last_layers_mobilenet(inputs, 17, 512,
                                         num_anchors * (num_classes + 5))
@@ -346,20 +461,31 @@ class CarNet:
         encoder = self.build_encoder(inputs, alpha=self._alpha)
         encoder_output = encoder.output
         
-        residual_block12 = encoder.get_layer('block_12_project_BN').output
-        residual_block5 = encoder.get_layer('block_5_project_BN').output
+        if self.backbone == BACKBONE.MOBILENETV2:
+            freeze_layers = 155
+            residual_end = encoder.get_layer('block_12_project_BN').output
+            residual_middle = encoder.get_layer('block_5_project_BN').output
+            yolo_decoder = self.build_mobilenet_yolo(  encoder_output, residual_middle, residual_end,self.n_anchors, self.n_class, alpha=self._alpha)
+        elif self.backbone == BACKBONE.EFFICIENTNET:
+            freeze_layers = 499
+            residual_end = encoder.get_layer('swish_65').output
+            residual_middle = encoder.get_layer('swish_29').output
+            yolo_decoder = self.build_efficientnet_yolo(  encoder_output, residual_middle, residual_end,self.n_anchors, "efficientnet-b4", batch_norm_momentum=0.9,
+                                    batch_norm_epsilon=1e-3,
+                                    num_classes=self.n_class,
+                                    drop_connect_rate=0.2,
+                                    data_format="channels_first")
         #segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 12
         
-        lane_seg_decoder = self.build_lane_detection(encoder_output, residual_block5, alpha=self._alpha)
-        drive_seg_decoder =  self.build_drivable_detection(encoder_output, residual_block5, alpha=self._alpha) 
-        yolo_decoder = self.build_yolo_body(  encoder_output, residual_block5, residual_block12,self.n_anchors, self.n_class, alpha=self._alpha)
+        lane_seg_decoder = self.build_lane_detection(encoder_output, residual_middle, alpha=self._alpha)
+        drive_seg_decoder =  self.build_drivable_detection(encoder_output, residual_middle, alpha=self._alpha) 
+       
         #TODO implement tiny yolo as a detector head
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
          
         model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
         
         # Freeze the encoder.
-        freeze_layers = min(freeze_layers, 155)
         for i in range(freeze_layers):
             encoder.layers[i].trainable = False
         print('Freeze the first {} layers of total {} layers.'.format(
@@ -372,8 +498,10 @@ if __name__ == '__main__':
     """
     test code
     """
+
+    backbone = BACKBONE.EFFICIENTNET
     test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 256, 512, 3), name='input')
-    model = CarNet(inputs=None,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
+    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
         ret,
