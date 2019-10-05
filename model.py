@@ -5,7 +5,7 @@ import tensorflow as tf
 from typing import List, Tuple
 from tools.utils import compose
 from override import mobilenet_v2
-from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs
+from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
 from tools.modes import OPT, BACKBONE
 class CarNet:
     def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
@@ -234,8 +234,8 @@ class CarNet:
     def build_lane_detection(self, inputs,residual, n_seg_class=None, alpha=1.0, upsample_output=True, last_layer_name=None):       
             if n_seg_class is None:
                 n_seg_class=self.n_lane_embedding
-            with tf.name_scope("lane_seg"):
-                
+            inputs = tf.keras.layers.Conv2D(256, (3,3), padding="same", dilation_rate=2)(inputs)
+            with tf.name_scope("lane_seg"):  
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
                             use_bias=False)(inputs)
@@ -274,11 +274,10 @@ class CarNet:
 
                 return lane_output
 
-    def build_drivable_detection(self, inputs, residual, n_seg_class=None, upsample_output=True,alpha=1.0, last_layer_name=None):
-            
-            
+    def build_drivable_detection(self, inputs, residual, n_seg_class=None, upsample_output=True,alpha=1.0, last_layer_name=None):     
             if n_seg_class is None:
-                n_seg_class = self.n_drive_embedding   
+                n_seg_class = self.n_drive_embedding  
+            inputs = tf.keras.layers.Conv2D(256, (3,3), padding="same", dilation_rate=2)(inputs)
             with tf.name_scope("drive_seg"): 
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
@@ -484,12 +483,12 @@ class CarNet:
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
          
         model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
-        
+        #model = tf.keras.Model(inputs, encoder.output)
         # Freeze the encoder.
         for i in range(freeze_layers):
             encoder.layers[i].trainable = False
         print('Freeze the first {} layers of total {} layers.'.format(
-            freeze_layers, len(encoder.layers)))
+            freeze_layers, len(model.layers)))
         return model
         
 
@@ -499,7 +498,7 @@ if __name__ == '__main__':
     test code
     """
 
-    backbone = BACKBONE.EFFICIENTNET
+    backbone = BACKBONE.MOBILENETV2
     test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 256, 512, 3), name='input')
     model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
@@ -508,7 +507,7 @@ if __name__ == '__main__':
         to_file='model.png',
         show_shapes=False,
         show_layer_names=True,
-        rankdir='LR'
+        rankdir="TB"
                 )
 
     ret.summary()
