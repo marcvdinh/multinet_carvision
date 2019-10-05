@@ -30,13 +30,12 @@ def train(FLAGS):
     test_dataset_glob=FLAGS['test_dataset']
     freeze_step = FLAGS['epochs'][0]
     train_step = FLAGS['epochs'][1]
-
     if opt == OPT.DEBUG:
         tf.get_logger().setLevel(tf.logging.DEBUG)
-        tf.keras.backend.set_session(
+        tf.keras.backend.set_session(   
             tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
     elif opt == OPT.XLA:
-        config = tf.ConfigProto()
+        config = tf.compat.v1.ConfigProto()
         config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
         sess = tf.Session(config=config)
         tf.keras.backend.set_session(sess)
