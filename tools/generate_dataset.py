@@ -64,11 +64,11 @@ def create_tf_example(src_dir,img):
     classes = [] # List of integer class id of bounding box (1 per box) 
     check = False
     image_name = img['name'].split('.')[0]
-    image_path = ops.join(src_dir, 'images', "100k", "train")
+    image_path = ops.join(src_dir, 'images', "100k", "val")
     image_path = ops.join(image_path, img['name'])
     assert ops.exists(image_path), '{:s} not exist'.format(image_path)
     drive_name = image_name + "_drivable_id.png"
-    drive_path = ops.join(src_dir,'drivable_maps', "labels", "train")
+    drive_path = ops.join(src_dir,'drivable_maps', "labels", "val")
     drive_path = ops.join(drive_path, drive_name)
     assert ops.exists(drive_path), '{:s} not exist'.format(drive_path)
     
@@ -122,7 +122,7 @@ def create_tf_example(src_dir,img):
     
     traffic_signs = [label for label in labels if label['category'] == 'traffic sign']
     traffic_lights = [label for label in labels if label['category'] == 'traffic light']
-    cars = traffic_signs = [label for label in labels if label['category'] == 'car']
+    cars = [label for label in labels if label['category'] == 'car']
     riders = [label for label in labels if label['category'] == 'rider']
     motors = [label for label in labels if label['category'] == 'motor']
     bikes = [label for label in labels if label['category'] == 'bike']
@@ -252,10 +252,10 @@ def create_tf_example(src_dir,img):
 
 
 def main(_):
-    json_file_path = '/home/marcdinh/Documents/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_train.json'
+    json_file_path = '/home/marcdinh/Documents/BDD100K/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_val.json'
     src_dir = '/home/marcdinh/Documents/BDD100K/bdd100k/'
     num_shards=10
-    output_filebase='data/train/train_dataset'
+    output_filebase='data/val/val_dataset'
     with contextlib2.ExitStack() as tf_record_close_stack:
         output_tfrecords = open_sharded_output_tfrecords(
         tf_record_close_stack, output_filebase, num_shards)
