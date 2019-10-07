@@ -76,17 +76,26 @@ class Dataset(tf.keras.callbacks.Callback):
         return image, (lane_label, drive_label, y1, y2, y3)
 
     def _dataset_internal(self,files,dataset_builder,parser):
-        dataset = dataset_builder(files)
+        dataset = tf.data.Dataset.list_files(files)
+        #dataset = files.interleave(tf.data.TFRecordDataset, cycle_length=FLAGS.num_parallel_reads,
+        #        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
         if self.mode == DATASET_MODE.TRAIN:
             #train_num = reduce(
             #    lambda x, y: x + y,
             #    map(lambda file: int(self._get_num_from_name(file)), files))
             train_num = 70000
-            dataset = dataset.shuffle(train_num).map(
+            dataset = dataset.interleave(
+                lambda file: dataset_builder(file),
+                cycle_length=len(files),
+                num_parallel_calls=AUTOTUNE).shuffle(train_num).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
-            dataset = dataset.shuffle(10000).map(
+            dataset = dataset.interleave(
+                lambda file: dataset_builder(file),
+                cycle_length=len(files),
+                num_parallel_calls=AUTOTUNE).shuffle(10000).map(
                     parser, num_parallel_calls=AUTOTUNE).prefetch(
                         self.batch_size).batch(self.batch_size).repeat()
         elif self.mode == DATASET_MODE.TEST:
