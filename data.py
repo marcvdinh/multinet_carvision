@@ -84,24 +84,25 @@ class Dataset(tf.keras.callbacks.Callback):
             #train_num = reduce(
             #    lambda x, y: x + y,
             #    map(lambda file: int(self._get_num_from_name(file)), files))
-            train_num = 70000
+            num = 70000
             dataset = dataset.interleave(
                 lambda file: dataset_builder(file),
                 cycle_length=len(files),
-                num_parallel_calls=AUTOTUNE).shuffle(train_num).map(
+                num_parallel_calls=AUTOTUNE).shuffle(num).map(
                     parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(
                         AUTOTUNE).repeat()
         elif self.mode == DATASET_MODE.VALIDATE:
+            num = 10000
             dataset = dataset.interleave(
                 lambda file: dataset_builder(file),
                 cycle_length=len(files),
-                num_parallel_calls=AUTOTUNE).shuffle(10000).map(
+                num_parallel_calls=AUTOTUNE).shuffle(num).map(
                     parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(
                         AUTOTUNE).repeat()
         elif self.mode == DATASET_MODE.TEST:
             dataset = dataset.map(
                     parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(AUTOTUNE)
-        return dataset
+        return dataset, num
 
     def __init__(self,
                  glob_path: str,
@@ -146,7 +147,7 @@ class Dataset(tf.keras.callbacks.Callback):
             tfrecords=list(filter(lambda file:file.endswith('.tfrecords'),files))
             txts=list(filter(lambda file: file.endswith('.txt'), files))
             if len(tfrecords)>0:
-                tfrecords_dataset=self._dataset_internal(tfrecords,tf.data.TFRecordDataset, self.parse_tfrecord)
+                tfrecords_dataset, num = self._dataset_internal(tfrecords,tf.data.TFRecordDataset, self.parse_tfrecord)
             #if len(txts) > 0:
             #    txts_dataset=self._dataset_internal(txts,tf.data.TextLineDataset,self.parse_text)
             if len(tfrecords)>0 and len(txts) > 0:
