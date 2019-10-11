@@ -5,7 +5,8 @@ import tensorflow as tf
 from typing import List, Tuple
 from tools.utils import compose
 from override import mobilenet_v2
-from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
+from encoder_zoo.efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
+from encoder_zoo.mnasnet_models import build_mnasnet_base
 from tools.modes import OPT, BACKBONE
 class CarNet:
     def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
@@ -117,7 +118,7 @@ class CarNet:
             encoder = EfficientNetB4(include_top=False,
                                         weights='imagenet',
                                         input_shape=inputs_shape,
-                                        classes= self.n_class,
+                                        classes=self.n_class,
                                         input_tensor=inputs)
 
     
@@ -485,8 +486,8 @@ class CarNet:
         model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
         #model = tf.keras.Model(inputs, encoder.output)
         # Freeze the encoder.
-        for i in range(freeze_layers):
-            encoder.layers[i].trainable = False
+        for i in range(len(encoder.layers)):
+            model.layers[i].trainable = False
         print('Freeze the first {} layers of total {} layers.'.format(
             freeze_layers, len(model.layers)))
         return model
@@ -504,7 +505,7 @@ if __name__ == '__main__':
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
         ret,
-        to_file='model.png',
+        to_file='mobilenet_model.png',
         show_shapes=False,
         show_layer_names=True,
         rankdir="TB"

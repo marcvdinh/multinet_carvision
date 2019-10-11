@@ -222,7 +222,7 @@ def create_tf_example(src_dir,img):
             classes_text.append(b"traffic lig: red")
             classes.append(1)
         if traffic_light["attributes"]["trafficLightColor"] == "yellow":
-            classes_text.append(b"traffic lig: none")
+            classes_text.append(b"traffic lig: yellow")
             classes.append(2)  
         if traffic_light["attributes"]["trafficLightColor"] == "green":
             classes_text.append(b"traffic lig: green")
