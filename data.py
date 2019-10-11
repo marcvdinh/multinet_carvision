@@ -100,6 +100,7 @@ class Dataset(tf.keras.callbacks.Callback):
                     parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(
                         AUTOTUNE).repeat()
         elif self.mode == DATASET_MODE.TEST:
+            num = 0
             dataset = dataset.map(
                     parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(AUTOTUNE)
         return dataset, num
