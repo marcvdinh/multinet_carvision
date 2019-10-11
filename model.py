@@ -477,13 +477,13 @@ class CarNet:
                                     data_format="channels_first")
         #segmentation_head = residual_block12 #output stride 16 with block 5, output stride 8 with block 12
         
-        lane_seg_decoder = self.build_lane_detection(encoder_output, residual_middle, alpha=self._alpha)
+        #lane_seg_decoder = self.build_lane_detection(encoder_output, residual_middle, alpha=self._alpha)
         drive_seg_decoder =  self.build_drivable_detection(encoder_output, residual_middle, alpha=self._alpha) 
        
         #TODO implement tiny yolo as a detector head
         #tiny_yolo_decoder = self.build_tiny_yolo_body(encoder_output, self.n_anchors, self.n_class)
          
-        model = tf.keras.Model(inputs, [lane_seg_decoder, drive_seg_decoder, yolo_decoder])
+        model = tf.keras.Model(inputs, [drive_seg_decoder, yolo_decoder])
         #model = tf.keras.Model(inputs, encoder.output)
         # Freeze the encoder.
         for i in range(len(encoder.layers)):

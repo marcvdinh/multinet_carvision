@@ -73,7 +73,7 @@ class Dataset(tf.keras.callbacks.Callback):
         y2.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
         y3.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
 
-        return image, (lane_label, drive_label, y1, y2, y3)
+        return image, (drive_label, y1, y2, y3)
 
     def _dataset_internal(self,files,dataset_builder,parser):
         dataset = tf.data.Dataset.list_files(files)

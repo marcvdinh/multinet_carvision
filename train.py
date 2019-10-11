@@ -49,7 +49,7 @@ def train(FLAGS):
     model_path = FLAGS['model']
     lr = FLAGS['learning_rate']
 
-    strategy = tf.distribute.MirroredStrategy()
+    strategy = tf.distribute.MirroredStrategy(FLAGS['gpus'])
     batch_size = batch_size * strategy.num_replicas_in_sync
     #print([train_dataset_glob,batch_size, anchors, num_classes, input_shape])
     train_dataset_callback = Dataset(train_dataset_glob,
@@ -101,9 +101,9 @@ def train(FLAGS):
     yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
     yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
         
-    lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
+    #lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
     drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
-    losses = [lane_loss , drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
+    losses = [drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
 
         #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}
     #else:
@@ -146,13 +146,13 @@ def train(FLAGS):
                                                     **new_pruning_params)
         pruned_model.compile(optimizer=tf.keras.optimizers.Adam(lr[0],
                                                                 epsilon=1e-8),
-                             loss=loss)
+                             loss=losses)
         pruned_model.fit(train_dataset,
                          epochs=train_step,
                          initial_epoch=0,
                          steps_per_epoch=max(1, train_num // batch_size),
                          callbacks=[
-                             checkpoint, cos_lr, logging, map_callback,
+                             checkpoint, cos_lr, logging, # map_callback,
                              train_dataset_callback, early_stopping
                          ],
                          validation_data=val_dataset,
@@ -178,6 +178,8 @@ def train(FLAGS):
 
     if True:
         with strategy.scope():
+            for i in range(len(model.layers)):
+                print(model.layers[i].trainable)
             print("training Phase 1")
             model.compile(optimizer=tf.keras.optimizers.Adam(lr[0],epsilon=1e-8),
                           loss=losses)
@@ -197,6 +199,7 @@ def train(FLAGS):
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
     if True:
+        tf.compat.v1.keras.backend.clear_session()
         for i in range(len(model.layers)):
             model.layers[i].trainable = True
         with strategy.scope():
