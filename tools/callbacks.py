@@ -107,8 +107,8 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
         for image, lane, drive, boxes, labels in test_dataset.take(1):
             boxed_image, resized_image_shape = letterbox_image(
                     image, self.input_shape)
-            boxed_lane, _ = letterbox_image(
-                   lane, self.input_shape)
+            #boxed_lane, _ = letterbox_image(
+            #       lane, self.input_shape)
             boxed_drive, _ = letterbox_image(
                     drive, self.input_shape)
             gt_boxes = tf.squeeze(boxes)
@@ -120,7 +120,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
             image_detect = tf.keras.preprocessing.image.array_to_img(tf.squeeze(image))
             image_detect_gt = tf.keras.preprocessing.image.array_to_img(tf.squeeze(image))
         out_boxes, out_scores, out_classes = yolo_eval(
-                [output[2], output[3], output[4]],
+                [output[1], output[2], output[3]],
                 self.anchors,
                 len(self.class_names),
                 image_shape,
@@ -193,12 +193,12 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
         #image_detect.show()
         yolo_output = tf.expand_dims(tf.convert_to_tensor(np.array(image_detect)), 0)
         yolo_gt = tf.expand_dims(tf.convert_to_tensor(np.array(image_detect_gt)), 0)
-        pred_lane_mask = self.create_mask(output[0])
-        pred_drive_mask = self.create_mask(output[1])
+        #pred_lane_mask = self.create_mask(output[0])
+        pred_drive_mask = self.create_mask(output[0])
         writer = tf.summary.create_file_writer('./tboard')
         with writer.as_default():
             tf.summary.image("image input", boxed_image, epoch)
-            tf.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask], 0), epoch)
+            #tf.summary.image("lane segmentation", tf.concat([boxed_lane, pred_lane_mask], 0), epoch)
             tf.summary.image("drive segmentation", tf.concat([boxed_drive, pred_drive_mask], 0), epoch)
             tf.summary.image("yolo output", tf.concat([yolo_gt, yolo_output], 0), epoch)
         return
