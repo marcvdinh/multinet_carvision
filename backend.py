@@ -18,7 +18,7 @@ from typing import List, Tuple
 from tensorflow_serving.apis import prediction_log_pb2, predict_pb2
 from tensorflow.python import debug as tf_debug
 from functools import partial
-#from model import build_yolo_body
+from model import CarNet
 tf.keras.backend.set_learning_phase(0)
 
 
@@ -42,26 +42,6 @@ class YOLO(object):
         self.class_names = get_classes(FLAGS['classes_path'])
         self.anchors = get_anchors(FLAGS['anchors_path'])
         self.input_shape = FLAGS['input_size']
-        config = tf.ConfigProto()
-
-        if self.opt == OPT.XLA:
-            config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-            sess = tf.Session(config=config)
-            tf.keras.backend.set_session(sess)
-        elif self.opt == OPT.MKL:
-            config.intra_op_parallelism_threads = 4
-            config.inter_op_parallelism_threads = 4
-            sess = tf.Session(config=config)
-            tf.keras.backend.set_session(sess)
-        elif self.opt == OPT.DEBUG:
-            tf.logging.set_verbosity(tf.logging.DEBUG)
-            sess = tf_debug.TensorBoardDebugWrapperSession(
-                tf.Session(config=tf.ConfigProto(log_device_placement=True)),
-                "localhost:6064")
-            tf.keras.backend.set_session(sess)
-        else:
-            sess = tf.keras.backend.get_session()
-        self.sess = sess
         self.generate(FLAGS)
 
     def generate(self, FLAGS):
@@ -73,61 +53,24 @@ class YOLO(object):
         # Load model, or construct model and load weights.
         num_anchors = len(self.anchors)
         num_classes = len(self.class_names)
+        num_lane = 2
+        num_drive = 3
         try:
             model = tf.keras.models.load_model(model_path, compile=False)
         except:
-            if self.backbone == BACKBONE.MOBILENETV2:
-                model_body = partial(build_yolo_body,
-                                     alpha=FLAGS['alpha'])
-            #elif self.backbone == BACKBONE.DARKNET53:
-            #    model_body = darknet_yolo_body
-            #elif self.backbone == BACKBONE.EFFICIENTNET:
-            #    model_body = partial(efficientnet_yolo_body,
-            #                         model_name='efficientnet-b4',
-            #                         num_anchors=num_anchors // 3,
-            #                         batch_norm_momentum=0.9,
-            #                         batch_norm_epsilon=1e-3,
-            #                         num_classes=num_classes,
-            #                         drop_connect_rate=0.2,
-            #                         data_format="channels_first")
-            if tf.executing_eagerly():
-                input = tf.keras.layers.Input(shape=(*self.input_shape, 3),
-                                              name='predict_image')
-                model = model_body(input,
-                                   num_anchors=num_anchors // 3,
-                                   num_classes=num_classes)
-            else:
-                input = tf.keras.layers.Input(shape=(None, None, 3),
-                                              name='predict_image',
-                                              dtype=tf.uint8)
-                input_image = tf.map_fn(
-                    lambda image: tf.image.convert_image_dtype(
-                        image, tf.float32), input, tf.float32)
-                image, shape = letterbox_image(input_image, self.input_shape)
-                self.input_image_shape = tf.shape(input_image)[1:3]
-                image = tf.reshape(image, [-1, *self.input_shape, 3])
-                model = model_body(image,
-                                   num_anchors=num_anchors // 3,
-                                   num_classes=num_classes)
-            self.input = input
-            model.load_weights(
-                model_path)  # make sure model, anchors and classes match
-        else:
-            assert model.layers[-1].output_shape[-1] == \
-                   num_anchors / len(model.output) * (num_classes + 5), \
-                'Mismatch between model and given anchor and class sizes'
-        print('{} model, anchors, and classes loaded.'.format(model_path))
-        # Generate colors for drawing bounding boxes.
-        if tf.executing_eagerly():
-            self.yolo_model = model
-        else:
-            output = YoloEval(self.anchors,
-                              len(self.class_names),
-                              self.input_image_shape,
-                              score_threshold=self.score,
-                              iou_threshold=self.nms,
-                              name='yolo')(model.output)
-            self.yolo_model = tf.keras.Model(model.input, output)
+            multinet = CarNet(self.backbone, tf.keras.layers.Input(shape=(*self.input_shape,3)),
+                                                weights_path=model_path,
+                                                n_class=num_classes,
+                                                n_anchors=len(self.anchors)//3,
+                                                n_lane_embedding=num_lane,
+                                                n_drive_embedding=num_drive,
+                                                alpha=1.4)
+        
+            model = multinet.build()
+            model.load_weights(model_path)
+        
+        
+        self.yolo_model = model
         # Generate output tensor targets for filtered bounding boxes.
         hsv_tuples = [
             (x / len(self.class_names), 1., 1.)
@@ -158,7 +101,7 @@ class YOLO(object):
             start = timer()
             output = self.yolo_model.predict(image_data)
             out_boxes, out_scores, out_classes = yolo_eval(
-                output,
+                [output[1], output[2], output[3]],
                 self.anchors,
                 len(self.class_names),
                 image.shape[0:2],
@@ -167,13 +110,6 @@ class YOLO(object):
             end = timer()
             image = Image.fromarray((np.array(image) * 255).astype('uint8'),
                                     'RGB')
-        else:
-            image_data = np.expand_dims(image, 0)
-            start = timer()
-            out_boxes, out_scores, out_classes = self.sess.run(
-                self.yolo_model.output, feed_dict={self.input: image_data})
-            end = timer()
-
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
         if draw:
             font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
@@ -229,13 +165,11 @@ def export_serving_model(yolo, path):
             raise ValueError(
                 "Export directory already exists, and isn't empty. Please choose a different export directory, or delete all the contents of the specified directory: "
                 + path)
-    tf.saved_model.simple_save(
-        yolo.sess,
-        path,
-        inputs={'predict_image:0': yolo.input},
-        outputs={t.name: t for t in yolo.yolo_model.output})
+    tf.keras.models.save_model(
+        yolo,
+        path)
 
-    asset_extra = os.path.join(path, "assets.extra")
+"""     asset_extra = os.path.join(path, "assets.extra")
     tf.io.gfile.mkdir(asset_extra)
     with tf.io.TFRecordWriter(
             os.path.join(asset_extra, "tf_serving_warmup_requests")) as writer:
@@ -253,18 +187,15 @@ def export_serving_model(yolo, path):
             tf.make_tensor_proto(image_data))
         log = prediction_log_pb2.PredictionLog(
             predict_log=prediction_log_pb2.PredictLog(request=request))
-        writer.write(log.SerializeToString())
+        writer.write(log.SerializeToString()) """
 
 
 def export_tflite_model(yolo, path):
-    yolo.yolo_model.input.set_shape([None, *yolo.input_shape, 3])
-    converter = tf.lite.TFLiteConverter.from_session(
-        yolo.sess, [yolo.yolo_model.input], list(yolo.yolo_model.output))
-    converter.allow_custom_ops = True
-    converter.inference_type = tf.lite.constants.FLOAT
-    converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_SIZE]
-    input_arrays = converter.get_input_arrays()
-    converter.quantized_input_stats = {input_arrays[0]: (0., 1.)}
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(yolo)
+    converter.allow_custom_ops = [True]
+    converter.target_spec.supported_types = [tf.lite.constants.FLOAT16]
+    converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_LATENCY]
     tflite_model = converter.convert()
     tf.io.gfile.GFile(path, "wb").write(tflite_model)
 
@@ -279,7 +210,7 @@ def calculate_map(yolo, glob):
     mAP = np.mean([APs[cls] for cls in APs])
     print('mAP: ', mAP)
 
-def inference_img(image_path):
+def inference_img(image_path,yolo):
     try:
         if tf.executing_eagerly():
             content = tf.io.read_file(image_path)
@@ -298,13 +229,13 @@ def inference_img(image_path):
 def detect_img(yolo):
     while True:
         inputs = input('Input image filename:')
-        if inputs.endsWith('.txt'):
+        if inputs.endswith('.txt'):
             with open(input) as file:
                 for image_path in file.readlines():
                     image_path = image_path.strip()
-                    inference_img(image_path)
+                    inference_img(image_path, yolo)
         else:
-            inference_img(inputs)
+            inference_img(inputs, yolo)
     yolo.close_session()
 
 

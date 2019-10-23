@@ -467,6 +467,7 @@ class CarNet:
             residual_middle = encoder.get_layer('block_5_project_BN').output
             yolo_decoder = self.build_mobilenet_yolo(  encoder_output, residual_middle, residual_end,self.n_anchors, self.n_class, alpha=self._alpha)
         elif self.backbone == BACKBONE.EFFICIENTNET:
+        #TODO add members/setters for efficientnet hyperparameters instead of hardcoded values
             freeze_layers = 499
             residual_end = encoder.get_layer('swish_65').output
             residual_middle = encoder.get_layer('swish_29').output
@@ -500,7 +501,7 @@ if __name__ == '__main__':
     """
 
     backbone = BACKBONE.MOBILENETV2
-    test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 256, 512, 3), name='input')
+    test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 416, 3), name='input')
     model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     tf.keras.utils.plot_model(
