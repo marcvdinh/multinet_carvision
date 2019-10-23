@@ -21,18 +21,18 @@ flags.DEFINE_enum_class(
     "Select network backbone, One of {'MOBILENETV2','DARKNET53','EFFICIENTNET'}"
 )
 flags.DEFINE_integer('batch_size',
-                     default=8,
+                     default=64,
                      lower_bound=0,
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[40, 20],
+                           default=[50, 50],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
 flags.DEFINE_string('export', default='export_model/8', help="Export path")
 flags.DEFINE_string('input', default=None, help="Input data for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(256, 512),
+                           default=(224, 384),
                            lower_bound=0,
                            help="Input size")
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
@@ -53,7 +53,7 @@ flags.DEFINE_string('train_dataset',
                     default='data/train/*.tfrecords',
                     help="Dataset glob for train")
 flags.DEFINE_string('val_dataset',
-                    default='data/train/*.tfrecords',
+                    default='data/val/*.tfrecords',
                     help="Dataset glob for validate")
 flags.DEFINE_string('test_dataset',
                     default='data/train/*.tfrecords',
@@ -121,11 +121,12 @@ def main(_):
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
-        for gpu in gpus:
-            try:
+        try:
+            for gpu in gpus:
+            
                 tf.config.experimental.set_memory_growth(gpu,True)
-                flags_dict['gpus']= tf.config.experimental.list_logical_devices('GPU')
-            except RuntimeError as e:
+            flags_dict['gpus']= tf.config.experimental.list_logical_devices('GPU')
+        except RuntimeError as e:
                 print(e)
     if flags_dict['backbone'] is None:
         raise ValueError("Please select your model's backbone")
