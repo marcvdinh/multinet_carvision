@@ -121,11 +121,12 @@ def main(_):
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
-        gpu_indexs=[int(gpu.name.split(':')[-1]) for gpu in gpus]
-        valid_gpu_indexs=list(filter(lambda gpu: gpu in flags_dict['gpus'],gpu_indexs))
-        valid_gpus=[gpus[index] for index in valid_gpu_indexs]
-        tf.config.experimental.set_visible_devices(valid_gpus, 'GPU')
-        flags_dict['gpus']=get_gpu_name(valid_gpus)
+        for gpu in gpus:
+            try:
+                tf.config.experimental.set_memory_growth(gpu,True)
+                flags_dict['gpus']= tf.config.experimental.list_logical_devices('GPU')
+            except RuntimeError as e:
+                print(e)
     if flags_dict['backbone'] is None:
         raise ValueError("Please select your model's backbone")
     if FLAGS.mode == MODE.TRAIN:
