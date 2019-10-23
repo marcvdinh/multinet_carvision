@@ -5,8 +5,8 @@ import tensorflow as tf
 from typing import List, Tuple
 from tools.utils import compose
 from override import mobilenet_v2
-from encoder_zoo.efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
-from encoder_zoo.mnasnet_models import build_mnasnet_base
+from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
+#from encoder_zoo.mnasnet_models import build_mnasnet_base
 from tools.modes import OPT, BACKBONE
 class CarNet:
     def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
