@@ -96,13 +96,14 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs={}):
        
-        test_dataset_builder = Dataset(self.glob_path,
-                                       self.batch_size,
-                                       input_shapes=self.input_shape,
-                                       mode=DATASET_MODE.VALIDATE)
-        bind(test_dataset_builder, self.parse_tfrecord)
-        test_dataset, test_num = test_dataset_builder.build()
+        #test_dataset_builder = Dataset(self.glob_path,
+        #                               self.batch_size,
+        #                               input_shapes=self.input_shape,
+        #                               mode=DATASET_MODE.VALIDATE)
+        #bind(test_dataset_builder, self.parse_tfrecord)
+        #test_dataset, test_num = test_dataset_builder.build()
 
+        test_dataset = self.validation_data
 
         for image, lane, drive, boxes, labels in test_dataset.take(1):
             boxed_image, resized_image_shape = letterbox_image(
