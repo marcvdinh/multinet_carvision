@@ -87,7 +87,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
         labels = features['image/object/bbox/label'].values
 
         gt_boxes = tf.stack([ymins, xmins, ymaxs, xmaxs], 1)
-        return image, lane, drive, gt_boxes, labels
+        return image, drive, gt_boxes, labels
 
     def create_mask(self,pred_mask):
         pred_mask = tf.argmax(pred_mask, axis=-1)
@@ -105,7 +105,7 @@ class TensorBoardImage(tf.keras.callbacks.Callback):
 
         test_dataset = self.validation_data
 
-        for image, lane, drive, boxes, labels in test_dataset.take(1):
+        for image, drive, boxes, labels in test_dataset.take(1):
             boxed_image, resized_image_shape = letterbox_image(
                     image, self.input_shape)
             #boxed_lane, _ = letterbox_image(
