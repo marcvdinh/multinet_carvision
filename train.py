@@ -49,7 +49,7 @@ def train(FLAGS):
     model_path = FLAGS['model']
     lr = FLAGS['learning_rate']
 
-    strategy = tf.distribute.MirroredStrategy(FLAGS['gpus'])
+    strategy = tf.distribute.MirroredStrategy()
     batch_size = batch_size * strategy.num_replicas_in_sync
     #print([train_dataset_glob,batch_size, anchors, num_classes, input_shape])
     train_dataset_callback = Dataset(train_dataset_glob,
