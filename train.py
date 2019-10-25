@@ -80,7 +80,7 @@ def train(FLAGS):
                                                     save_weights_only=True,
                                                     save_best_only=True,
                                                     period=3)
-    image_viewer = TensorBoardImage(input_shapes=input_shape, anchors=anchors,class_names = class_names, validation_data=val_dataset,glob_path=test_dataset_glob, tag="phase1")
+    #image_viewer = TensorBoardImage(input_shapes=input_shape, anchors=anchors,class_names = class_names, validation_data=val_dataset,glob_path=test_dataset_glob, tag="phase1")
     if tf.version.VERSION.startswith('1.'):
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
@@ -188,7 +188,7 @@ def train(FLAGS):
             epochs=freeze_step,
             initial_epoch=0,
             steps_per_epoch=max(1, train_num // batch_size),
-            callbacks=[logging, checkpoint, image_viewer],
+            callbacks=[logging, checkpoint],
             validation_data=val_dataset,
             validation_steps=max(1, val_num // batch_size))
         model.save_weights(
@@ -211,7 +211,7 @@ def train(FLAGS):
                            initial_epoch=freeze_step,
                            steps_per_epoch=max(1, train_num // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, early_stopping, image_viewer #TODO fix logging and mapcallback
+                               checkpoint, cos_lr, early_stopping, logging #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))
