@@ -166,7 +166,7 @@ def export_serving_model(yolo, path):
                 "Export directory already exists, and isn't empty. Please choose a different export directory, or delete all the contents of the specified directory: "
                 + path)
     tf.keras.models.save_model(
-        yolo,
+        yolo.yolo_model,
         path)
 
 """     asset_extra = os.path.join(path, "assets.extra")
@@ -192,9 +192,9 @@ def export_serving_model(yolo, path):
 
 def export_tflite_model(yolo, path):
 
-    converter = tf.lite.TFLiteConverter.from_keras_model(yolo)
-    converter.allow_custom_ops = [True]
-    converter.target_spec.supported_types = [tf.lite.constants.FLOAT16]
+    converter = tf.lite.TFLiteConverter.from_keras_model(yolo.yolo_model)
+    converter.allow_custom_ops = True
+    #converter.target_spec.supported_types = [tf.lite.constants.FLOAT16]
     converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_LATENCY]
     tflite_model = converter.convert()
     tf.io.gfile.GFile(path, "wb").write(tflite_model)
@@ -210,7 +210,7 @@ def calculate_map(yolo, glob):
     mAP = np.mean([APs[cls] for cls in APs])
     print('mAP: ', mAP)
 
-def inference_img(image_path,yolo):
+def inference_img(image_path, yolo):
     try:
         if tf.executing_eagerly():
             content = tf.io.read_file(image_path)
