@@ -32,9 +32,12 @@ def letterbox_image(image, size):
 
     resized_image = tf.image.resize(image, [nh, nw])
     new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
-    #image_color_padded = tf.cast(tf.equal(new_image, 0),
-    #                             tf.float32) * (128 / 255)
-    return new_image, tf.shape(resized_image)
+    image_color_padded = tf.cast(tf.equal(new_image, 0),
+                                 tf.float32) * (128 / 255)
+    image = new_image + image_color_padded
+    image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
+                           tf.constant(1.0, dtype=tf.float32))
+    return image, tf.shape(resized_image)
 
 
 def random_gamma(image, min, max):
@@ -258,7 +261,9 @@ def get_random_data(image,
     bbox = tf.boolean_mask(bbox, tf.logical_and(bbox_w > 1, bbox_h > 1))
     bbox = tf.cond(tf.greater(
         tf.shape(bbox)[0], max_boxes), lambda: bbox[:max_boxes], lambda: bbox)
-
+    #image normalization
+    image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
+                           tf.constant(1.0, dtype=tf.float32))
     return image, lane_label, drive_label, bbox
 
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
