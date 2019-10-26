@@ -87,7 +87,7 @@ def train(FLAGS):
                                                    train_step)().numpy(), 1)
     else:
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
-            lambda epoch, _: tf.keras.experimental.CosineDecay(
+            lambda epoch, _: tf.keras.experimental.CosineDecayRestarts(
                 lr[1], train_step)(epoch - freeze_step).numpy(), 1)
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',

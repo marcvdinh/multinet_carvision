@@ -197,7 +197,9 @@ def export_tflite_model(yolo, path):
     #converter.target_spec.supported_types = [tf.lite.constants.FLOAT16]
     converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_LATENCY]
     tflite_model = converter.convert()
-    tf.io.gfile.GFile(path, "wb").write(tflite_model)
+    open(os.path.join(path,"converted_model.tflite"), "wb").write(tflite_model)
+
+    #tf.io.gfile.GFile(path, "wb").write(tflite_model)
 
 
 def calculate_map(yolo, glob):
@@ -307,8 +309,8 @@ def detect_video(yolo: YOLO, video_path: str, output_path: str = ""):
                 top, left, bottom, right = boxes[i]
                 height = abs(bottom - top)
                 width = abs(right - left)
-                tracker = cv2.TrackerCSRT_create()
-                #tracker = cv2.TrackerKCF_create()
+                #tracker = cv2.TrackerCSRT_create()
+                tracker = cv2.TrackerKCF_create()
                 #tracker = cv2.TrackerMOSSE_create()
                 tracker.init(frame, (left, top, width, height))
                 trackers.append([tracker, predicted_class])
