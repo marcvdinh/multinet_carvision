@@ -152,7 +152,7 @@ def get_random_data(image,
                                                  max_jpeg_quality)
         if noise > 0:
             image = image + tf.cast(
-                tf.random.uniform(shape=[input_shape[0], input_shape[1], 3],
+                tf.random.uniform(shape=[nh, nw, 3],
                                   minval=0,
                                   maxval=noise), tf.float32)
         if blur:
@@ -170,15 +170,13 @@ def get_random_data(image,
                                                  tf.cast(w, tf.int32))
             return image
         image = tf.image.per_image_standardization(image)
-        new_image = tf.cond(
+        image = tf.cond(
             tf.logical_or(nw > w, nh > h),
             lambda: crop_and_pad(image, dx, dy), lambda: tf.image
             .pad_to_bounding_box(image, tf.cast(tf.math.maximum(
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
-        
-       
-        
+    
         new_lane_label = tf.cond(
             tf.logical_or(nw > w, nh > h),
             lambda: crop_and_pad(lane_label, dx, dy), lambda: tf.image
@@ -260,9 +258,7 @@ def get_random_data(image,
     bbox = tf.boolean_mask(bbox, tf.logical_and(bbox_w > 1, bbox_h > 1))
     bbox = tf.cond(tf.greater(
         tf.shape(bbox)[0], max_boxes), lambda: bbox[:max_boxes], lambda: bbox)
-    #image normalization
-    #image = tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
-    #                       tf.constant(1.0, dtype=tf.float32))
+
     return image, lane_label, drive_label, bbox
 
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
