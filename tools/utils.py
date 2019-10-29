@@ -32,11 +32,10 @@ def letterbox_image(image, size):
 
     resized_image = tf.image.resize(image, [nh, nw])
     new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
-    image_color_padded = tf.cast(tf.equal(new_image, 0),
-                                 tf.float32) * (128 / 255)
-    image = new_image + image_color_padded
-    image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
-                           tf.constant(1.0, dtype=tf.float32))
+    #image = new_image + image_color_padded
+    image = tf.image.per_image_standardization(new_image)
+    #image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
+    #                       tf.constant(1.0, dtype=tf.float32))
     return image, tf.shape(resized_image)
 
 
@@ -151,10 +150,8 @@ def get_random_data(image,
                 dy, 0), tf.int32), tf.cast(tf.math.maximum(dx, 0), tf.int32),
                                  tf.cast(h, tf.int32), tf.cast(w, tf.int32)))
         new_image = crop_and_pad(image, dx, dy)
-        image_color_padded = tf.cast(tf.equal(new_image, 0),
-                                     tf.float32) * (128 / 255)
-        image = image_color_padded + new_image
-
+        image = tf.image.per_image_standardization(new_image)
+        
         new_lane_label = tf.cond(
             tf.logical_or(nw > w, nh > h),
             lambda: crop_and_pad(lane_label, dx, dy), lambda: tf.image
@@ -215,9 +212,8 @@ def get_random_data(image,
                                                  tf.cast(dx, tf.int32),
                                                  tf.cast(h, tf.int32),
                                                  tf.cast(w, tf.int32))
-        image_color_padded = tf.cast(tf.equal(new_image, 0),
-                                     tf.float32) * (128 / 255)
-        image = image_color_padded + new_image
+        
+       image = tf.image.per_image_standardization(new_image)
         
         lane_label = tf.image.resize(lane_label,
                                 [tf.cast(nh, tf.int32),
@@ -262,8 +258,8 @@ def get_random_data(image,
     bbox = tf.cond(tf.greater(
         tf.shape(bbox)[0], max_boxes), lambda: bbox[:max_boxes], lambda: bbox)
     #image normalization
-    image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
-                           tf.constant(1.0, dtype=tf.float32))
+    #image = tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
+    #                       tf.constant(1.0, dtype=tf.float32))
     return image, lane_label, drive_label, bbox
 
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
