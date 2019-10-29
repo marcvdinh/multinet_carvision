@@ -213,7 +213,7 @@ def get_random_data(image,
                                                  tf.cast(h, tf.int32),
                                                  tf.cast(w, tf.int32))
         
-       image = tf.image.per_image_standardization(new_image)
+        image = tf.image.per_image_standardization(new_image)
         
         lane_label = tf.image.resize(lane_label,
                                 [tf.cast(nh, tf.int32),
