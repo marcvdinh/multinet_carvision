@@ -86,7 +86,10 @@ def train(FLAGS):
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
                                                    train_step)().numpy(), 1)
     else:
-        cos_lr = tf.keras.callbacks.LearningRateScheduler(
+        cos_lr_1 = tf.keras.callbacks.LearningRateScheduler(
+            lambda epoch, _: tf.keras.experimental.CosineDecayRestarts(
+                lr[0], freeze_step)(epoch).numpy(), 1)
+        cos_lr_2 = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.keras.experimental.CosineDecayRestarts(
                 lr[1], train_step)(epoch - freeze_step).numpy(), 1)
     early_stopping = tf.keras.callbacks.EarlyStopping(
@@ -188,7 +191,7 @@ def train(FLAGS):
             epochs=freeze_step,
             initial_epoch=0,
             steps_per_epoch=max(1, train_num // batch_size),
-            callbacks=[logging, checkpoint],
+            callbacks=[logging, checkpoint, cos_lr_1],
             validation_data=val_dataset,
             validation_steps=max(1, val_num // batch_size))
         model.save_weights(
@@ -211,7 +214,7 @@ def train(FLAGS):
                            initial_epoch=freeze_step,
                            steps_per_epoch=max(1, train_num // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, early_stopping, logging #TODO fix logging and mapcallback
+                               checkpoint, cos_lr_2, early_stopping, logging #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))
@@ -233,7 +236,7 @@ def train(FLAGS):
                            initial_epoch= freeze_step,
                            steps_per_epoch=max(1, train_num // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, early_stopping, image_viewer #TODO fix logging and mapcallback
+                               checkpoint, cos_lr_2, early_stopping, image_viewer #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))
