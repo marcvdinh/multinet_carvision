@@ -86,6 +86,7 @@ def train(FLAGS):
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
                                                    train_step)().numpy(), 1)
     else:
+        exp_lr = tf.keras.optimizer.schedules.ExponentialDecay(lr[0],freeze_step, 0.96)
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.keras.experimental.CosineDecayRestarts(
                 lr[1], train_step)(epoch - freeze_step).numpy(), 1)
@@ -181,7 +182,7 @@ def train(FLAGS):
             for i in range(len(model.layers)):
                 print(model.layers[i].trainable)
             print("training Phase 1")
-            model.compile(optimizer=tf.keras.optimizers.Adam(lr[0],epsilon=1e-8),
+            model.compile(optimizer=tf.keras.optimizers.Adam(exp_lr,epsilon=1e-8),
                           loss=losses)
         model.fit(
             train_dataset,
@@ -203,7 +204,7 @@ def train(FLAGS):
         for i in range(len(model.layers)):
             model.layers[i].trainable = True
         with strategy.scope():
-            model.compile(optimizer=tf.keras.optimizers.Adam(lr[1],epsilon=1e-8),
+            model.compile(optimizer=tf.keras.optimizers.SGD(lr[1],momentum=0.9),
                                loss=losses)  # recompile to apply the change
         print('finetune at layer 100.')
         model.fit(train_dataset,
@@ -225,7 +226,7 @@ def train(FLAGS):
         for i in range(50, len(model.layers)):
             model.layers[i].trainable = True
         with strategy.scope():
-            model.compile(optimizer=tf.keras.optimizers.Adam(lr[1],epsilon=1e-8),
+            model.compile(optimizer=tf.keras.optimizers.Adam(exp_lr,epsilon=1e-8),
                                loss=losses)  # recompile to apply the change
         print('finetune at layer 50.')
         model.fit(train_dataset,
