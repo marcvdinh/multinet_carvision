@@ -86,7 +86,7 @@ def train(FLAGS):
             lambda epoch, _: tf.train.cosine_decay(lr[1], epoch - freeze_step,
                                                    train_step)().numpy(), 1)
     else:
-        exp_lr = tf.keras.optimizer.schedules.ExponentialDecay(lr[0],freeze_step, 0.96)
+        exp_lr = tf.keras.optimizers.schedules.ExponentialDecay(lr[0], freeze_step, 0.96, staircase=True)
         cos_lr = tf.keras.callbacks.LearningRateScheduler(
             lambda epoch, _: tf.keras.experimental.CosineDecayRestarts(
                 lr[1], train_step)(epoch - freeze_step).numpy(), 1)

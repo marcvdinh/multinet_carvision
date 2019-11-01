@@ -480,10 +480,9 @@ class CarNet:
         model = tf.keras.Model(inputs, [drivable_map, detections])
         #model = tf.keras.Model(inputs, encoder.output)
         # Freeze the encoder.
-        if self.backbone != BACKBONE.PELEE:
-            for i in range(len(encoder.layers)):
-                encoder.layers[i].trainable = False
-            print('Freeze the first {} layers of total {} layers.'.format(
+        for i in range(len(encoder.layers)):
+            encoder.layers[i].trainable = False
+        print('Freeze the first {} layers of total {} layers.'.format(
                 freeze_layers, len(model.layers)))
         return model
         
