@@ -89,16 +89,16 @@ class Dataset(tf.keras.callbacks.Callback):
                 lambda file: dataset_builder(file),
                 cycle_length=len(files),
                 num_parallel_calls=AUTOTUNE).shuffle(num).map(
-                    parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(
-                        AUTOTUNE).repeat()
+                    parser, num_parallel_calls=AUTOTUNE).repeat().batch(self.batch_size).prefetch(
+                        AUTOTUNE)
         elif self.mode == DATASET_MODE.VALIDATE:
             num = 10000
             dataset = dataset.interleave(
                 lambda file: dataset_builder(file),
                 cycle_length=len(files),
                 num_parallel_calls=AUTOTUNE).shuffle(num).map(
-                    parser, num_parallel_calls=AUTOTUNE).batch(self.batch_size).prefetch(
-                        AUTOTUNE).repeat()
+                    parser, num_parallel_calls=AUTOTUNE).repeat().batch(self.batch_size).prefetch(
+                        AUTOTUNE)	
         elif self.mode == DATASET_MODE.TEST:
             num = 0
             dataset = dataset.map(
