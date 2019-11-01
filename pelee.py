@@ -6,7 +6,8 @@ import tensorflow as tf
 from tools.utils import compose
 
 
-
+HEADLESS = "/home/marcdinh/multinet_carvision/weights/pelee_headless_weights.h5"
+LAST_LAYER = "/home/marcdinh/multinet_carvision/weights/pelee_weights.h5"
 def Conv2D( ch, kernel, strides=1):
     return compose(
             tf.keras.layers.Conv2D(ch,
@@ -56,7 +57,7 @@ def ResBlock(Input, out_filter):
     return  added
 
 
-def PeleeNet(Input, classes=1000, last_layer=True):
+def PeleeNet(Input, classes=1000, last_layer=True, weights = True):
     n_dense_layers = [3,4,8,6]
     bottleneck_width = [1,2,4,4]
     out_layers = [128,256,512,704]
@@ -86,7 +87,14 @@ def PeleeNet(Input, classes=1000, last_layer=True):
         x = tf.keras.layers.GlobalAveragePooling2D()(x)
         x = tf.keras.layers.Dense(classes, activation = "softmax")(x)
     
-    return tf.keras.Model(Input, x)
+    peleenet = tf.keras.Model(Input, x)
+
+    if last_layer==True and weights==True:
+        peleenet.load_weights(LAST_LAYER)
+    elif last_layer==False and weights==True:
+        peleenet.load_weights(HEADLESS)
+    
+    return peleenet
 
 
 if __name__ == '__main__':
@@ -95,5 +103,5 @@ if __name__ == '__main__':
     """
     #backbone = BACKBONE.MOBILENETV2
     #test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')
-    model = PeleeNet(tf.keras.Input([224,224,3]), False)
+    model = PeleeNet(tf.keras.Input([224,224,3]), last_layer=False)
     model.summary()
