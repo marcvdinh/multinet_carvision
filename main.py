@@ -8,31 +8,31 @@ if tf.version.VERSION.startswith('1.'):
     tf.enable_v2_tensorshape()
 from tools.modes import BACKBONE, MODE, OPT
 from train import train
-#from train_backbone import train as train_backbone
+from train_backbone import train as train_backbone
 from backend import YOLO, detect_video, detect_img, export_tflite_model, export_serving_model, calculate_map, export_tfjs_model
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum_class(
     'backbone',
-    default=BACKBONE.MOBILENETV2,
+    default=BACKBONE.PELEE,
     enum_class=BACKBONE,
     help=
     "Select network backbone, One of {'MOBILENETV2','DARKNET53','EFFICIENTNET'}"
 )
 flags.DEFINE_integer('batch_size',
-                     default=64,
+                     default=128,
                      lower_bound=0,
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[50, 50],
+                           default=[120, 20],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
 flags.DEFINE_string('export', default='export_model/8', help="Export path")
 flags.DEFINE_string('input', default=None, help="Input data for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(224, 384),
+                           default=(320, 320),
                            lower_bound=0,
                            help="Input size")
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
@@ -42,7 +42,7 @@ flags.DEFINE_string(
     help="Model path")
 flags.DEFINE_enum_class(
     'mode',
-    default=MODE.TRAIN,
+    default=MODE.TRAIN_BACKBONE,
     enum_class=MODE,
     help=
     "Select exec mode, One of {'TRAIN','TRAIN_BACKBONE','IMAGE','VIDEO','TFLITE','SERVING','MAP','PRUNE'}"
@@ -50,7 +50,7 @@ flags.DEFINE_enum_class(
 
 flags.DEFINE_multi_integer('gpus', default=[0], help="Specific gpu indexes to run")
 flags.DEFINE_string('train_dataset',
-                    default='data/train/*.tfrecords',
+                    default='data/101_ObjectCategories',
                     help="Dataset glob for train")
 flags.DEFINE_string('val_dataset',
                     default='data/val/*.tfrecords',
@@ -62,10 +62,10 @@ flags.DEFINE_string('anchors_path',
                     default='config/yolo_anchors.txt',
                     help="Anchors path")
 flags.DEFINE_string('classes_path',
-                    default='config/bdd100k_classes.txt',
+                    default='config/caltech101_classes.txt',
                     help="Classes Path")
 flags.DEFINE_multi_float('learning_rate',
-                         default=[1e-3, 1e-4],
+                         default=[25e-2, 5e-3],
                          lower_bound=0,
                          help="Learning rate")
 flags.DEFINE_enum_class(
@@ -122,13 +122,9 @@ def main(_):
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         try:
-            gpu_indexs=[int(gpu.name.split(':')[-1]) for gpu in gpus]
-            valid_gpu_indexs=list(filter(lambda gpu: gpu in flags_dict['gpus'],gpu_indexs))
-            valid_gpus=[gpus[index] for index in valid_gpu_indexs]
-            tf.config.experimental.set_visible_devices(valid_gpus,'GPU')
-            for gpu in valid_gpus:     
+            for gpu in gpus:
+                #tf.config.experimental.set_visible_devices(gpu,'GPU')     
                 tf.config.experimental.set_memory_growth(gpu,True)
-                flags_dict['gpus']= tf.config.experimental.list_logical_devices('GPU')
         except RuntimeError as e:
             print(e)
     if flags_dict['backbone'] is None:
@@ -138,7 +134,7 @@ def main(_):
         train(flags_dict)
     elif FLAGS.mode == MODE.TRAIN_BACKBONE:
         log('Train backbone mode')
-        #train_backbone(flags_dict)
+        train_backbone(flags_dict)
     elif FLAGS.mode == MODE.IMAGE:
         if flags_dict['model'] is None:
             raise ValueError('Please enter your model path')
