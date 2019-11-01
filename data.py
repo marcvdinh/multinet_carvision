@@ -29,11 +29,11 @@ class Dataset(tf.keras.callbacks.Callback):
                                               feature_description)
         filename = tf.compat.as_str_any(features['image/filename'])
         
-        image = tf.image.decode_image(features['image/encoded'],
+        image = tf.io.decode_image(features['image/encoded'],
                                       channels=3,
                                       dtype=tf.float32)
         image.set_shape([None, None, 3])
-        lane = expand_seg_label(tf.image.decode_image(features['image/lane'],
+        lane = expand_seg_label(tf.io.decode_image(features['image/lane'],
                                       channels=1,
                                       dtype=tf.uint8
                                       ),
@@ -41,7 +41,7 @@ class Dataset(tf.keras.callbacks.Callback):
                                       "lane")
         lane.set_shape([None, None, self.num_lane])
         
-        drive = expand_seg_label(tf.image.decode_image(features['image/drive'],
+        drive = expand_seg_label(tf.io.decode_image(features['image/drive'],
                                       channels=1,
                                       dtype=tf.uint8
                                       ),
