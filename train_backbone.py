@@ -18,7 +18,7 @@ class BackboneDataset():
     """
     def __init__(self,dataset_glob, input_shape, class_names, batch_size):
         dataset_glob = pathlib.Path(dataset_glob)
-        self.CLASS_NAMES = np.array([item.name for item in dataset_glob.glob('*') if item.name != "BACKGROUND_Google"])
+        self.CLASS_NAMES = np.array([item.name for item in dataset_glob.glob('*') if item.name != "License.txt"])
         self.IMG_WIDTH = input_shape[1]
         self.IMG_HEIGHT = input_shape[0]
         self.batch_size = batch_size
@@ -105,13 +105,14 @@ def train(FLAGS):
         str(backbone).split('.')[1].lower() + str(datetime.date.today()))
     strategy = tf.distribute.MirroredStrategy()
     batch_size = batch_size * strategy.num_replicas_in_sync
+    Input = tf.keras.Input((input_size[0], input_size[1],3))
     with strategy.scope():
         if backbone == BACKBONE.MOBILENETV2:
-            model = mobilenetv2(tf.keras.Input((input_size[0], input_size[1],3)), 1.4, len(class_names))
+            model = mobilenetv2(Input, 1.4, len(class_names))
         elif backbone == BACKBONE.EFFICIENTNET:
-            model = EfficientNet(tf.keras.Input((input_size[0], input_size[1],3)), len(class_names), input_size)
+            model = EfficientNet(Input, len(class_names), input_size)
         elif backbone == BACKBONE.PELEE:
-            model = PeleeNet(tf.keras.Input((input_size[0], input_size[1],3)), len(class_names), input_size)
+            model = PeleeNet(Input, len(class_names), input_size)
         model.compile(tf.keras.optimizers.Adam(1e-3),
                       loss=tf.keras.losses.categorical_crossentropy,
                       metrics=[tf.keras.metrics.categorical_accuracy])
@@ -127,7 +128,7 @@ def train(FLAGS):
 
 
     cos_lr = tf.keras.callbacks.LearningRateScheduler(
-        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[0], epoch)(epochs[0]).numpy(),
+        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[0], epochs[0])(epoch).numpy(),
         1)
     logging = tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_images=True)
     checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
@@ -136,23 +137,27 @@ def train(FLAGS):
                                                     verbose=1,
                                                     period=3)
     model.fit(train_dataset,
-              epochs=epochs,
-              steps_per_epoch=max(1, 8000 // batch_size),
+              epochs=epochs[0],
+              initial_epoch=0,
+              steps_per_epoch=max(1, 10000 // batch_size),
+              validation_data = train_dataset,
               #validation_split=0.2,
-              #validation_steps=max(1, 2000 // batch_size),
+              validation_steps=1,
               callbacks=[cos_lr, logging, checkpoint])
 
     cos_lr = tf.keras.callbacks.LearningRateScheduler(
-        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[1], epoch)(epochs[1]).numpy(),
+        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[1], epochs[1])(epoch - epochs[0]).numpy(),
         1)
     model.fit(train_dataset,
-              epochs=epochs,
-              steps_per_epoch=max(1, 8000 // batch_size),
+              epochs=epochs[0]+epochs[1],
+              initial_epoch = epochs[0],
+              steps_per_epoch=max(1, 10000 // batch_size),
               #validation_split=0.2,
-              #validation_steps=max(1, 2000 // batch_size),
+              validation_data = train_dataset,
+              validation_steps=1,
               callbacks=[cos_lr, logging, checkpoint])
     #for pelee only
-    headless = tf.keras.Model(tf.keras.Input((input_size[0], input_size[1],3)), model.layer['re_lu_112'].output)
+    headless = tf.keras.Model(Input, model.get_layer('re_lu_112').output)
     model.save_weights(
         os.path.join(
             log_dir,
