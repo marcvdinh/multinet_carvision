@@ -18,7 +18,7 @@ class BackboneDataset():
     """
     def __init__(self,dataset_glob, input_shape, class_names, batch_size):
         dataset_glob = pathlib.Path(dataset_glob)
-        self.CLASS_NAMES = np.array([item.name for item in dataset_glob.glob('*') if item.name != "LICENSE.txt"])
+        self.CLASS_NAMES = np.array([item.name for item in dataset_glob.glob('*') if item.name != "BACKGROUND_Google"])
         self.IMG_WIDTH = input_shape[1]
         self.IMG_HEIGHT = input_shape[0]
         self.batch_size = batch_size
@@ -27,7 +27,7 @@ class BackboneDataset():
         # convert the path to a list of path components
         parts = tf.strings.split(file_path, '/')
         # The second to last is the class-directory
-        return tf.cast(tf.equal (parts[-2], self.CLASS_NAMES), tf.float32)
+        return tf.cast(tf.equal(parts[-2], self.CLASS_NAMES), tf.float32)
     
     def decode_img(self,img):
         # convert the compressed string to a 3D uint8 tensor
@@ -47,6 +47,7 @@ class BackboneDataset():
     def build(self):
         
         list_ds = tf.data.Dataset.list_files(self.dataset_glob)
+        ds = list_ds.cache()
         ds = list_ds.map(self.process_path, num_parallel_calls=AUTOTUNE).shuffle(10000).batch(self.batch_size).prefetch(AUTOTUNE).repeat()
 
         return ds
@@ -92,12 +93,13 @@ def train(FLAGS):
     batch_size = FLAGS['batch_size']
     #use_tpu = FLAGS['use_tpu']
     class_names = get_classes(FLAGS['classes_path'])
-    epochs = FLAGS['epochs'][0]
+    epochs = FLAGS['epochs']
     input_size = FLAGS['input_size']
     model_path = FLAGS['model']
     backbone = FLAGS['backbone']
     train_dataset_glob = FLAGS['train_dataset']
     val_dataset_glob = FLAGS['val_dataset']
+    lr = FLAGS['learning_rate']
     log_dir = FLAGS['log_directory'] or os.path.join(
         'logs',
         str(backbone).split('.')[1].lower() + str(datetime.date.today()))
@@ -125,7 +127,7 @@ def train(FLAGS):
 
 
     cos_lr = tf.keras.callbacks.LearningRateScheduler(
-        lambda epoch, _: tf.keras.experimental.CosineDecay(1e-3, epoch)(epochs).numpy(),
+        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[0], epoch)(epochs[0]).numpy(),
         1)
     logging = tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_images=True)
     checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(
@@ -139,7 +141,23 @@ def train(FLAGS):
               #validation_split=0.2,
               #validation_steps=max(1, 2000 // batch_size),
               callbacks=[cos_lr, logging, checkpoint])
+
+    cos_lr = tf.keras.callbacks.LearningRateScheduler(
+        lambda epoch, _: tf.keras.experimental.CosineDecay(lr[1], epoch)(epochs[1]).numpy(),
+        1)
+    model.fit(train_dataset,
+              epochs=epochs,
+              steps_per_epoch=max(1, 8000 // batch_size),
+              #validation_split=0.2,
+              #validation_steps=max(1, 2000 // batch_size),
+              callbacks=[cos_lr, logging, checkpoint])
+    #for pelee only
+    headless = tf.keras.Model(tf.keras.Input((input_size[0], input_size[1],3)), model.layer['re_lu_112'].output)
     model.save_weights(
         os.path.join(
             log_dir,
             str(backbone).split('.')[1].lower() + '_trained_weights.h5'))
+    headless.save_weights(
+        os.path.join(
+            log_dir,
+            str(backbone).split('.')[1].lower() + 'headless_trained_weights.h5'))
