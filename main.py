@@ -26,11 +26,13 @@ flags.DEFINE_integer('batch_size',
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[20, 180],
+                           default=[10, 100],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
-flags.DEFINE_string('export', default='export_model/trt', help="Export path")
-flags.DEFINE_string('input', default='/home/marcdinh/Downloads/final_5db38d06c6f9820014534120_227345.mp4', help="Input data for various mode")
+flags.DEFINE_string('export', default='weights/mobilenetv2_trained_weights_stage_2.h5
+', help="Export path")
+flags.DEFINE_string('weights', default='export_model/trt', help="weights path")
+flags.DEFINE_string('input', default='/home/marcdinh/Videos/commaai/test.mp4', help="Input data for various mode")
 flags.DEFINE_string('output', default='', help="Output paht for various mode")
 flags.DEFINE_multi_integer('input_size',
                            default=(320, 320),
@@ -43,7 +45,7 @@ flags.DEFINE_string(
     help="Model path")
 flags.DEFINE_enum_class(
     'mode',
-    default=MODE.IMAGE,
+    default=MODE.TRAIN,
     enum_class=MODE,
     help=
     "Select exec mode, One of {'TRAIN','TRAIN_BACKBONE','IMAGE','VIDEO','TFLITE','SERVING','MAP','PRUNE','TRT'}"

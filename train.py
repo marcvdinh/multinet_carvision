@@ -21,6 +21,7 @@ def train(FLAGS):
     prune = FLAGS['prune']
     opt = FLAGS['opt']
     backbone = FLAGS['backbone']
+    weights_path = FLAGS['weights']
     log_dir = FLAGS['log_directory'] or os.path.join('logs',str(backbone).split('.')[1].lower()+str(datetime.date.today()))
     if tf.io.gfile.exists(log_dir) is not True:
         tf.io.gfile.mkdir(log_dir)
@@ -130,7 +131,8 @@ def train(FLAGS):
                                                 alpha=1.4)
         
         model = multinet.build()
-
+        if weights_path:
+            model.load_weights(weights_path)
 
     if prune:
         from tensorflow_model_optimization.python.core.api.sparsity import keras as sparsity
