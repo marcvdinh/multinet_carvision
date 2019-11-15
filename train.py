@@ -103,7 +103,8 @@ def train(FLAGS):
     yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
         
     #lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
-    drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
+    #drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
+    drive_loss = 'sparse_categorical_crossentropy'
     losses = [drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
 
         #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}

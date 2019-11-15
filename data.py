@@ -33,21 +33,17 @@ class Dataset(tf.keras.callbacks.Callback):
                                       channels=3,
                                       dtype=tf.float32)
         image.set_shape([None, None, 3])
-        lane = expand_seg_label(tf.io.decode_image(features['image/lane'],
+        lane =tf.io.decode_image(features['image/lane'],
                                       channels=1,
                                       dtype=tf.uint8
-                                      ),
-                                      self.num_lane, 
-                                      "lane")
-        lane.set_shape([None, None, self.num_lane])
+                                      )
+        lane.set_shape([None, None, 1])
         
-        drive = expand_seg_label(tf.io.decode_image(features['image/drive'],
+        drive = tf.io.decode_image(features['image/drive'],
                                       channels=1,
                                       dtype=tf.uint8
-                                      ),
-                                      self.num_drive,
-                                      "drive") 
-        drive.set_shape([None, None, self.num_drive])
+                                      )
+        drive.set_shape([None, None, 1])
 
         xmins = features['image/object/bbox/xmin'].values
         xmaxs = features['image/object/bbox/xmax'].values
@@ -136,14 +132,6 @@ class Dataset(tf.keras.callbacks.Callback):
         files = tf.io.gfile.glob(self.glob_path)
         if len(files)==0:
             raise ValueError('No file found')
-        try:
-            #TODO fix num
-            num = reduce(lambda x, y: x + y,
-                         map(lambda file: self._get_num_from_name(file), files))
-            num = 100000
-        except Exception:
-            raise ValueError(
-                'Please format file name like <name>_<number>.<extension>')
         else:
             tfrecords=list(filter(lambda file:file.endswith('.tfrecords'),files))
             txts=list(filter(lambda file: file.endswith('.txt'), files))

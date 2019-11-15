@@ -11,6 +11,7 @@ class MODE(Enum):
     PRUNE = 6
     TFJS = 7
     TRAIN_BACKBONE=8
+    TRT=9
 
 @unique
 class OPT(Enum):

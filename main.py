@@ -9,28 +9,29 @@ if tf.version.VERSION.startswith('1.'):
 from tools.modes import BACKBONE, MODE, OPT
 from train import train
 from train_backbone import train as train_backbone
-from backend import YOLO, detect_video, detect_img, export_tflite_model, export_serving_model, calculate_map, export_tfjs_model
+from backend import YOLO, detect_video, detect_img, export_tflite_model, export_trt_model,export_serving_model, calculate_map, export_tfjs_model
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum_class(
     'backbone',
-    default=BACKBONE.PELEE,
+    default=BACKBONE.MOBILENETV2,
     enum_class=BACKBONE,
     help=
     "Select network backbone, One of {'MOBILENETV2','DARKNET53','EFFICIENTNET'}"
 )
 flags.DEFINE_integer('batch_size',
-                     default=128,
+                     default=8,
                      lower_bound=0,
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[120, 20],
+                           default=[20, 180],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
-flags.DEFINE_string('export', default='export_model/8', help="Export path")
-flags.DEFINE_string('input', default=None, help="Input data for various mode")
+flags.DEFINE_string('export', default='export_model/trt', help="Export path")
+flags.DEFINE_string('input', default='/home/marcdinh/Downloads/final_5db38d06c6f9820014534120_227345.mp4', help="Input data for various mode")
+flags.DEFINE_string('output', default='', help="Output paht for various mode")
 flags.DEFINE_multi_integer('input_size',
                            default=(320, 320),
                            lower_bound=0,
@@ -38,19 +39,19 @@ flags.DEFINE_multi_integer('input_size',
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
 flags.DEFINE_string(
     'model',    
-    default='../download/mobilenetv2_trained_weights_final (1).h5',
+    default='export_model/saved_model',#'/media/marcdinh/PORPOISE/tboard/mobilenetv2_trained_weights_stage_2.h5',
     help="Model path")
 flags.DEFINE_enum_class(
     'mode',
-    default=MODE.TRAIN_BACKBONE,
+    default=MODE.IMAGE,
     enum_class=MODE,
     help=
-    "Select exec mode, One of {'TRAIN','TRAIN_BACKBONE','IMAGE','VIDEO','TFLITE','SERVING','MAP','PRUNE'}"
+    "Select exec mode, One of {'TRAIN','TRAIN_BACKBONE','IMAGE','VIDEO','TFLITE','SERVING','MAP','PRUNE','TRT'}"
 )
 
 flags.DEFINE_multi_integer('gpus', default=[0], help="Specific gpu indexes to run")
 flags.DEFINE_string('train_dataset',
-                    default='data/101_ObjectCategories',
+                    default='data/train/*.tfrecords',
                     help="Dataset glob for train")
 flags.DEFINE_string('val_dataset',
                     default='data/val/*.tfrecords',
@@ -62,10 +63,10 @@ flags.DEFINE_string('anchors_path',
                     default='config/yolo_anchors.txt',
                     help="Anchors path")
 flags.DEFINE_string('classes_path',
-                    default='config/caltech101_classes.txt',
+                    default='config/bdd100k_classes.txt',
                     help="Classes Path")
 flags.DEFINE_multi_float('learning_rate',
-                         default=[25e-2, 5e-3],
+                         default=[1e-3, 5e-4],
                          lower_bound=0,
                          help="Learning rate")
 flags.DEFINE_enum_class(
@@ -151,12 +152,15 @@ def main(_):
         log('Calculate test dataset map')
         calculate_map(YOLO(flags_dict), FLAGS.test_dataset)
     elif FLAGS.mode == MODE.SERVING:
-        tf.disable_eager_execution()
+        #tf.disable_eager_execution()
         log('Export hdf5 model to serving model')
         export_serving_model(YOLO(flags_dict), FLAGS.export)
     elif FLAGS.mode == MODE.TFLITE:
         log('Export hdf5 model to tflite model')
         export_tflite_model(YOLO(flags_dict), FLAGS.export)
+    elif FLAGS.mode == MODE.TRT:
+        log('Export hdf5 model to tf-trt model')
+        export_trt_model(YOLO(flags_dict), FLAGS.export)
     elif FLAGS.mode == MODE.TFJS:
         log('Export hdf5 model to tensorflow.js model')
         export_tfjs_model(YOLO(flags_dict), FLAGS.export)

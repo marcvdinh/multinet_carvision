@@ -4,9 +4,9 @@ import collections
 import tensorflow as tf
 from typing import List, Tuple
 from tools.utils import compose
-from override import mobilenet_v2
-from efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
-from pelee import PeleeNet, ResBlock, DenseLayer, Conv2D
+from encoder_zoo.override import mobilenet_v2
+from encoder_zoo.efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
+from encoder_zoo.pelee import PeleeNet, ResBlock, DenseLayer, Conv2D
 from tools.modes import OPT, BACKBONE
 class CarNet:
     def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
@@ -443,15 +443,13 @@ class CarNet:
         encoder_output = encoder.output
         features_shape = encoder_output.shape[1:]
         if self.backbone == BACKBONE.MOBILENETV2:
-            freeze_layers = 155
             residual_end = encoder.get_layer('block_12_project_BN').output
             residual_middle = encoder.get_layer('block_5_project_BN').output
             res_end_shape = residual_end.shape[1:]
             res_mid_shape = residual_middle.shape[1:]
             yolo_decoder = self.build_mobilenet_yolo( features_shape, res_mid_shape, res_end_shape,self.n_anchors, self.n_class, alpha=self._alpha)
         elif self.backbone == BACKBONE.EFFICIENTNET:
-        #TODO add members/setters for efficientnet hyperparameters instead of hardcoded values
-            freeze_layers = 499
+        #TODO add members/setters for efficientnet hyperparameters instead of hardcoded values        
             residual_end = encoder.get_layer('swish_65').output
             residual_middle = encoder.get_layer('swish_29').output
             res_end_shape = residual_end.shape[1:]
@@ -462,8 +460,7 @@ class CarNet:
                                     drop_connect_rate=0.2,
                                     data_format="channels_first")
         elif self.backbone == BACKBONE.PELEE:
-        #TODO add members/setters for efficientnet hyperparameters instead of hardcoded values
-            freeze_layers = 499
+        #TODO add members/setters for efficientnet hyperparameters instead of hardcoded values    
             residual_end = encoder.get_layer('stage_2').output
             residual_middle = encoder.get_layer('stage_1').output
             res_end_shape = residual_end.shape[1:]

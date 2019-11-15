@@ -30,14 +30,14 @@ def letterbox_image(image, size):
     dx = (w - nw) // 2
     dy = (h - nh) // 2
 
-    resized_image = tf.image.resize(image, [nh, nw])
-    resized_image = tf.image.per_image_standardization(resized_image)
-    new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
+    resized_image = tf.image.resize(image, [h, w])
+    resized_image = tf.cast(resized_image, tf.float32)/255.0
+    #new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
     #image = new_image + image_color_padded
-    
+    #new_image = tf.cast(resized_image, tf.float32)/255.0
     #image =  tf.subtract(tf.divide(image, tf.constant(127.5, dtype=tf.float32)),
     #                       tf.constant(1.0, dtype=tf.float32))
-    return new_image, tf.shape(resized_image)
+    return resized_image, tf.shape(resized_image)
 
 
 def random_gamma(image, min, max):
