@@ -31,7 +31,7 @@ def letterbox_image(image, size):
     dy = (h - nh) // 2
 
     resized_image = tf.image.resize(image, [h, w])
-    resized_image = tf.cast(resized_image, tf.float32)/255.0
+    #resized_image = tf.cast(resized_image, tf.float32)/255.0
     #new_image = tf.image.pad_to_bounding_box(resized_image, dy, dx, h, w)
     #image = new_image + image_color_padded
     #new_image = tf.cast(resized_image, tf.float32)/255.0
@@ -169,7 +169,7 @@ def get_random_data(image,
                                                  tf.cast(h, tf.int32),
                                                  tf.cast(w, tf.int32))
             return image
-        image = tf.cast(image, tf.float32)/255.0
+        #image = tf.cast(image, tf.float32)/255.0
         image = tf.cond(
             tf.logical_or(nw > w, nh > h),
             lambda: crop_and_pad(image, dx, dy), lambda: tf.image
@@ -208,7 +208,7 @@ def get_random_data(image,
         image = tf.image.resize(image,
                                 [tf.cast(h, tf.int32),
                                  tf.cast(w, tf.int32)])
-        image = tf.cast(image, tf.float32)/255.0
+        #image = tf.cast(image, tf.float32)/255.0
         #image = tf.image.pad_to_bounding_box(image, tf.cast(dy, tf.int32),
         #                                         tf.cast(dx, tf.int32),
         #                                         tf.cast(h, tf.int32),

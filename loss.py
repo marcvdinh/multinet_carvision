@@ -41,11 +41,14 @@ def yolo_correct_boxes(box_xy: tf.Tensor, box_wh: tf.Tensor,
     box_hw = box_wh[..., ::-1]
     input_shape = tf.cast(input_shape, box_yx.dtype)
     image_shape = tf.cast(image_shape, box_yx.dtype)
-    max_shape = tf.maximum(image_shape[0], image_shape[1])
-    ratio = image_shape / max_shape
-    boxed_shape = input_shape * ratio
-    offset = (input_shape - boxed_shape) / 2.
-    scale = image_shape / boxed_shape
+    #max_shape = tf.maximum(image_shape[0], image_shape[1])
+    #ratio = image_shpae / max_shape
+    ratio = image_shape / input_shape
+    #boxed_shape = input_shape * ratio
+    #offset = (input_shape - boxed_shape) / 2.
+    offset = 0
+    #scale = image_shape / boxed_shape
+    scale = ratio
     box_yx = (box_yx * input_shape - offset) * scale
     box_hw *= input_shape * scale
 

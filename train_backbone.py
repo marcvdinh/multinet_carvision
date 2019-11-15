@@ -2,10 +2,10 @@ import tensorflow as tf
 import pathlib
 import numpy as np
 from data import Dataset
-from override import mobilenet_v2
+from encoder_zoo.override import mobilenet_v2
 #from yolo3.darknet import darknet_body
-from efficientnet import EfficientNetB4
-from pelee import PeleeNet as pelee
+from encoder_zoo.efficientnet import EfficientNetB4
+from encoder_zoo.pelee import PeleeNet as pelee
 from tools.utils import get_classes, ModelFactory
 from tools.modes import BACKBONE
 import os
@@ -13,7 +13,7 @@ import datetime
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-class BackboneDataset():
+class CaltechDataset():
     """Backbone's Dataset extends Dataset,only support txt files now.
     """
     def __init__(self,dataset_glob, input_shape, class_names, batch_size):
@@ -44,6 +44,7 @@ class BackboneDataset():
         img = self.decode_img(img)
         return img, label
 
+
     def build(self):
         
         list_ds = tf.data.Dataset.list_files(self.dataset_glob)
@@ -52,7 +53,27 @@ class BackboneDataset():
 
         return ds
 
-
+class VOCDataset(Dataset):
+    def parse_tfrecord(self, example_proto):
+        feature_description = {
+            'image/encoded': tf.io.FixedLenFeature([], tf.string),
+            'image/object/bbox/xmin': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/xmax': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/ymin': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/ymax': tf.io.VarLenFeature(tf.float32),
+            'image/object/bbox/label': tf.io.VarLenFeature(tf.int64)
+        }
+        features = tf.io.parse_single_example(example_proto,
+                                              feature_description)
+        image = tf.image.decode_image(features['image/encoded'],
+                                      channels=3,
+                                      dtype=tf.float32)
+        image.set_shape([None, None, 3])
+        image =  tf.image.convert_image_dtype(image, tf.float32)
+        image = tf.image.resize(image, self.input_shape)
+        labels = tf.one_hot(features['image/object/bbox/label'].values, self.num_classes)
+        
+        return image, labels
 
 
 def mobilenetv2(inputs, alpha, classes):
@@ -87,7 +108,7 @@ def EfficientNet(inputs, classes, input_shape):
                           input_tensor=inputs)
 
 def PeleeNet(inputs, classes, input_shape):
-    return pelee(inputs, classes, True)
+    return pelee(inputs, classes, True, False)
 
 def train(FLAGS):
     batch_size = FLAGS['batch_size']
@@ -121,12 +142,19 @@ def train(FLAGS):
     #    tpu_strategy = tf.contrib.tpu.TPUDistributionStrategy(tpu)
     ##    model = tf.contrib.tpu.keras_to_tpu_model(model, strategy=tpu_strategy)
 
-    train_dataset = BackboneDataset(train_dataset_glob,
-                                               batch_size = batch_size,
-                                               class_names=class_names,
-                                               input_shape=input_size).build()
+    #train_dataset = CaltechDataset(train_dataset_glob,
+    #                                           batch_size = batch_size,
+    #                                           class_names=class_names,
+    #                                           input_shape=input_size).build()
 
-
+    train_dataset, _= VOCDataset(train_dataset_glob,
+                                               batch_size,
+                                               num_classes=len(class_names),
+                                               input_shapes=input_size).build()
+    val_dataset, _ = VOCDataset(val_dataset_glob,
+                                               batch_size,
+                                               num_classes=len(class_names),
+                                               input_shapes=input_size).build()
     cos_lr = tf.keras.callbacks.LearningRateScheduler(
         lambda epoch, _: tf.keras.experimental.CosineDecay(lr[0], epochs[0])(epoch).numpy(),
         1)
@@ -139,10 +167,10 @@ def train(FLAGS):
     model.fit(train_dataset,
               epochs=epochs[0],
               initial_epoch=0,
-              steps_per_epoch=max(1, 10000 // batch_size),
-              validation_data = train_dataset,
+              steps_per_epoch=max(1, 50000 // batch_size),
+              validation_data = val_dataset,
               #validation_split=0.2,
-              validation_steps=1,
+              validation_steps=50000,
               callbacks=[cos_lr, logging, checkpoint])
 
     cos_lr = tf.keras.callbacks.LearningRateScheduler(
@@ -151,10 +179,10 @@ def train(FLAGS):
     model.fit(train_dataset,
               epochs=epochs[0]+epochs[1],
               initial_epoch = epochs[0],
-              steps_per_epoch=max(1, 10000 // batch_size),
+              steps_per_epoch=max(1, 50000 // batch_size),
               #validation_split=0.2,
-              validation_data = train_dataset,
-              validation_steps=1,
+              validation_data = val_dataset,
+              validation_steps=50000,
               callbacks=[cos_lr, logging, checkpoint])
     #for pelee only
     headless = tf.keras.Model(Input, model.get_layer('re_lu_112').output)

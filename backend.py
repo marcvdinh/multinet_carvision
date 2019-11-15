@@ -16,7 +16,7 @@ from tools.modes import OPT, BACKBONE
 from tools.callbacks import MAPCallback
 import os
 from typing import List, Tuple
-from tensorflow_serving.apis import prediction_log_pb2, predict_pb2
+#from tensorflow_serving.apis import prediction_log_pb2, predict_pb2
 from tensorflow.python import debug as tf_debug
 from functools import partial
 from model import CarNet
@@ -128,7 +128,7 @@ class YOLO(object):
                 score_threshold=self.score,
                 iou_threshold=self.nms)
             end = timer()
-            image = Image.fromarray((np.array(image) * 255).astype('uint8'),
+            image = Image.fromarray((np.array(image)*255).astype('uint8'),
                                     'RGB')
             pred_mask = pred_mask.numpy()[0]
             drivable_area = Image.fromarray((255 - pred_mask * 127).astype('uint8'), 'L')
@@ -313,10 +313,14 @@ def detect_video(yolo: YOLO, video_path: str, output_path: str = ""):
     frame_count = 0
     while True:
         return_value, frame = vid.read()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(frame)
-        image_data = np.array(image)
-        result = np.asarray(yolo.detect_image(image_data))
+        #image.show()
+        image_data = np.array(image, dtype=np.float32 ) / 255.
+        result = yolo.detect_image(image_data)
         #result.show()
+        result = np.asarray(result)
+        result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)  
         curr_time = timer()
         exec_time = curr_time - prev_time
         prev_time = curr_time
