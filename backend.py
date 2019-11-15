@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image, ImageFont, ImageDraw
 import cv2
 import tensorflow as tf
+from tensorflow.python.compiler.tensorrt import trt_convert as trt
 from loss import yolo_eval, YoloEval
 from tools.utils import letterbox_image, get_anchors, get_classes
 from tools.modes import OPT, BACKBONE
@@ -43,12 +44,14 @@ class YOLO(object):
         self.anchors = get_anchors(FLAGS['anchors_path'])
         self.input_shape = FLAGS['input_size']
         self.generate(FLAGS)
+        self.score= 0.2
+        self.nms = 0.5
 
     def generate(self, FLAGS):
         model_path = os.path.expanduser(FLAGS['model'])
-        if model_path.endswith(
-            '.h5') is not True:
-            model_path=tf.train.latest_checkpoint(model_path)
+       # if model_path.endswith(
+       #     '.h5') is not True:
+       #     model_path=tf.train.latest_checkpoint(model_path)
 
         # Load model, or construct model and load weights.
         num_anchors = len(self.anchors)
@@ -56,8 +59,11 @@ class YOLO(object):
         num_lane = 2
         num_drive = 3
         try:
-            model = tf.keras.models.load_model(model_path, compile=False)
+            model = tf.keras.models.load_model(model_path)
+        #model.summary()
         except:
+            #try:
+            print("building model and loading_weights")
             multinet = CarNet(self.backbone, tf.keras.layers.Input(shape=(*self.input_shape,3)),
                                                 weights_path=model_path,
                                                 n_class=num_classes,
@@ -68,6 +74,8 @@ class YOLO(object):
         
             model = multinet.build()
             model.load_weights(model_path)
+            #except:
+            #    imported = tf.saved_model.load(model_path)
         
         
         self.yolo_model = model
@@ -97,9 +105,21 @@ class YOLO(object):
                 new_image_size = (height - (height % 32), width - (width % 32))
                 boxed_image, image_shape = letterbox_image(
                     image_data, new_image_size)
-            image_data = np.array(boxed_image)
+            boxed_image = np.array(boxed_image)
             start = timer()
-            output = self.yolo_model.predict(image_data)
+            try:
+                output = self.yolo_model.predict(boxed_image)
+            except:
+                graph_func = self.yolo_model.signatures[
+    tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY]
+                frozen_func = trt.convert_to_constants.convert_variables_to_constants_v2(
+    graph_func)
+                def wrap_func(*args, **kwargs):
+                #Assumes frozen_func has one output tensor
+                    return frozen_func(*args, **kwargs)
+                output = wrap_func(boxed_image).numpy()
+
+            pred_mask = tf.argmax(output[0], axis=-1)
             out_boxes, out_scores, out_classes = yolo_eval(
                 [output[1], output[2], output[3]],
                 self.anchors,
@@ -110,6 +130,12 @@ class YOLO(object):
             end = timer()
             image = Image.fromarray((np.array(image) * 255).astype('uint8'),
                                     'RGB')
+            pred_mask = pred_mask.numpy()[0]
+            drivable_area = Image.fromarray((255 - pred_mask * 127).astype('uint8'), 'L')
+            drivable_area = drivable_area.resize([image.size[0], image.size[1]])
+            drivable_color = Image.new("RGB", (image.size[0], image.size[1]),"green")
+            image = Image.composite(image, drivable_color, drivable_area)
+            #image.show()
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
         if draw:
             font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
@@ -169,6 +195,7 @@ def export_serving_model(yolo, path):
         yolo.yolo_model,
         path)
 
+
 """     asset_extra = os.path.join(path, "assets.extra")
     tf.io.gfile.mkdir(asset_extra)
     with tf.io.TFRecordWriter(
@@ -200,6 +227,27 @@ def export_tflite_model(yolo, path):
     open(os.path.join(path,"converted_model.tflite"), "wb").write(tflite_model)
 
     #tf.io.gfile.GFile(path, "wb").write(tflite_model)
+
+
+def export_trt_model(yolo, path):
+
+    if tf.io.gfile.exists(path):
+        overwrite = input("Overwrite existed model(yes/no):")
+        if overwrite == 'yes':
+            tf.io.gfile.rmtree(path)
+        else:
+            raise ValueError(
+                "Export directory already exists, and isn't empty. Please choose a different export directory, or delete all the contents of the specified directory: "
+                + path)
+    yolo.yolo_model.save(
+        path,
+        save_format='tf')
+
+    #params = params = trt.DEFAULT_TRT_CONVERSION_PARAMS._replace(
+    #precision_mode='FP16')
+    #converter = trt.TrtGraphConverterV2(input_saved_model_dir=path, conversion_params=params)
+    #converter.convert()
+    #converter.save(path)
 
 
 def calculate_map(yolo, glob):
@@ -266,74 +314,9 @@ def detect_video(yolo: YOLO, video_path: str, output_path: str = ""):
     while True:
         return_value, frame = vid.read()
         image = Image.fromarray(frame)
-        image_data = np.array(image) / 255.
-        draw = ImageDraw.Draw(image)
-        if detected:
-            for tracker, predicted_class in trackers:
-                success, box = tracker.update(frame)
-                left, top, width, height = box
-                right = left + width
-                bottom = top + height
-
-                label = '{}'.format(predicted_class)
-
-                label_size = draw.textsize(label, font)
-                if top - label_size[1] >= 0:
-                    text_origin = np.array([left, top - label_size[1]])
-                else:
-                    text_origin = np.array([left, top + 1])
-
-                # My kingdom for a good redistributable image drawing library.
-                for i in range(thickness):
-                    draw.rectangle([left + i, top + i, right - i, bottom - i],
-                                   outline=yolo.colors[c])
-                draw.rectangle(
-                    [tuple(text_origin),
-                     tuple(text_origin + label_size)],
-                    fill=yolo.colors[c])
-                draw.text(text_origin, label, fill=(0, 0, 0), font=font)
-                frame_count += 1
-                if frame_count == 100:
-                    for tracker in trackers:
-                        del tracker
-                    trackers = []
-                    frame_count = 0
-                    detected = False
-        else:
-            if tf.executing_eagerly():
-                boxes, scores, classes = yolo.detect_image(image_data, False)
-            else:
-                boxes, scores, classes = yolo.detect_image(image, False)
-            for i, c in enumerate(classes):
-                predicted_class = yolo.class_names[c]
-                top, left, bottom, right = boxes[i]
-                height = abs(bottom - top)
-                width = abs(right - left)
-                #tracker = cv2.TrackerCSRT_create()
-                tracker = cv2.TrackerKCF_create()
-                #tracker = cv2.TrackerMOSSE_create()
-                tracker.init(frame, (left, top, width, height))
-                trackers.append([tracker, predicted_class])
-
-                label = '{}'.format(predicted_class)
-                label_size = draw.textsize(label, font)
-                if top - label_size[1] >= 0:
-                    text_origin = np.array([left, top - label_size[1]])
-                else:
-                    text_origin = np.array([left, top + 1])
-
-                # My kingdom for a good redistributable image drawing library.
-                for i in range(thickness):
-                    draw.rectangle([left + i, top + i, right - i, bottom - i],
-                                   outline=yolo.colors[c])
-                draw.rectangle(
-                    [tuple(text_origin),
-                     tuple(text_origin + label_size)],
-                    fill=yolo.colors[c])
-                draw.text(text_origin, label, fill=(0, 0, 0), font=font)
-            detected = True
-        del draw
-        result = np.asarray(image)
+        image_data = np.array(image)
+        result = np.asarray(yolo.detect_image(image_data))
+        #result.show()
         curr_time = timer()
         exec_time = curr_time - prev_time
         prev_time = curr_time
