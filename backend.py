@@ -217,7 +217,7 @@ def export_serving_model(yolo, path):
         writer.write(log.SerializeToString()) """
 
 
-def export_tflite_model(yolo, path):
+def export_tflite_model(yolo, path, test_dataset_path, quant=True):
 
     converter = tf.lite.TFLiteConverter.from_keras_model(yolo.yolo_model)
     converter.allow_custom_ops = True
@@ -226,7 +226,27 @@ def export_tflite_model(yolo, path):
     tflite_model = converter.convert()
     open(os.path.join(path,"converted_model.tflite"), "wb").write(tflite_model)
 
-    #tf.io.gfile.GFile(path, "wb").write(tflite_model)
+    def open_image(img_path):
+        img = tf.io.read_file(img_path)
+        img = tf.io.decode_jpeg(img, channels=3)
+        img = tf.image.resize(img, yolo.input_shape)
+        img = tf.cast(img, tf.float32)/ 255.
+        return img
+    if quant:
+        list_ds = tf.data.Dataset.list_files(test_dataset_path)
+        quant_ds = list_ds.shuffle(len(list_ds)).map(lambda x: open_image(x)).batch(1).prefetch(1)
+        def representative_data_gen():
+            for input_value in quant_ds.take(100):
+                yield [input_value]
+        
+   
+        converter.representative_dataset = representative_data_gen
+        tflite_model_quant = converter.convert()
+        open(os.path.join(path,"converted_model_quant8.tflite"), "wb").write(tflite_model_quant)
+
+    
+    
+   
 
 
 def export_trt_model(yolo, path):
