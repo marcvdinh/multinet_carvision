@@ -286,8 +286,8 @@ class CarNet:
 
 #####################PELEENET############################################
     def make_last_layers_pelee(self, Input, num_filters, out_filters):
-        x= ResBlock(Input,num_filters)
-
+        #x= ResBlock(Input,num_filters)
+        x = DenseLayer(Input, 5, num_filters,2)
         y = DenseLayer(x,1,32,2)
         y = Conv2D(out_filters,1)(y)
         #y = tf.keras.layers.AveragePooling2D(strides=2)(y)
@@ -491,8 +491,8 @@ if __name__ == '__main__':
     """
 
     backbone = BACKBONE.PELEE
-    test_in_tensor = tf.keras.Input([224,224,3])
-    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
+    test_in_tensor = tf.keras.Input([320,320,3])
+    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     #for layers in ret.yolo_decoder:
     #    layers.trainable = False
