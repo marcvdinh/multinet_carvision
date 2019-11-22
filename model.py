@@ -400,13 +400,13 @@ class CarNet:
             with tf.name_scope("drive_seg"): 
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
-                            use_bias=False)(feat)
+                            use_bias=False)(inputs)
                 x_up = tf.keras.layers.BatchNormalization( epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
                 size = (x_up.shape[1], x_up.shape[2])
                 # avg pool
                 # TODO: AvgPool2D with such as large value, in effect, result in 1x1 value...
-                x_mid = tf.keras.layers.AveragePooling2D((49, 49), strides=(16, 20), padding="same")(feat)
+                x_mid = tf.keras.layers.AveragePooling2D((49, 49), strides=(16, 20), padding="same")(inputs)
                 #x_mid = tf.keras.layers.GlobalAveragePooling2D()(inputs)
                 #x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
                 x_mid = tf.keras.layers.Conv2D(128, (1, 1), padding='same')(x_mid)
