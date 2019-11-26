@@ -419,7 +419,7 @@ class CarNet:
 
                 # merge up and mid
                 x_up_mid_merged = tf.keras.layers.Multiply()([x_up, x_mid])
-                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=4, interpolation="bilinear")(x_up_mid_merged)
+                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=2, interpolation="bilinear")(x_up_mid_merged)
                 x_up_mid_merged = tf.keras.layers.Conv2D(n_seg_class, (1, 1),
                                         padding='same')(x_up_mid_merged)
 
