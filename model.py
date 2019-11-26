@@ -396,7 +396,7 @@ class CarNet:
                 n_seg_class = self.n_drive_embedding  
             inputs = tf.keras.Input(input_shape)
             res = tf.keras.Input(res_shape)
-            inputs = tf.keras.layers.Conv2D(128, (3,3), padding="same", dilation_rate=2)(inputs)
+            #inputs = tf.keras.layers.Conv2D(128, (3,3), padding="same", dilation_rate=2)(inputs)
             
             with tf.name_scope("drive_seg"): 
             # 1x1 conv
@@ -437,7 +437,7 @@ class CarNet:
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
 
-                return tf.keras.Model([feat,res], drive_output)
+                return tf.keras.Model([inputs,res], drive_output)
 
     def build(self,inputs=None, freeze_layers=None):
         if inputs is None:
