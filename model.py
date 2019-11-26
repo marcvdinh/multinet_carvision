@@ -2,6 +2,7 @@
 
 import collections
 import tensorflow as tf
+import numpy as np
 from typing import List, Tuple
 from tools.utils import compose
 from encoder_zoo.override import mobilenet_v2
@@ -403,7 +404,7 @@ class CarNet:
                             use_bias=False)(inputs)
                 x_up = tf.keras.layers.BatchNormalization( epsilon=1e-5, fused=True)(x_up)
                 x_up = tf.keras.layers.Activation('relu')(x_up)
-                size = (x_up.shape[1], x_up.shape[2])
+                #size = (x_up.shape[1]/2, x_up.shape[2]/2)
                 # avg pool
                 # TODO: AvgPool2D with such as large value, in effect, result in 1x1 value...
                 x_mid = tf.keras.layers.AveragePooling2D((49, 49), strides=(16, 20), padding="same")(inputs)
@@ -411,7 +412,8 @@ class CarNet:
                 #x_mid = tf.keras.layers.Reshape((1, 1, tf.keras.backend.int_shape(x_mid)[-1]))(x_mid)
                 x_mid = tf.keras.layers.Conv2D(128, (1, 1), padding='same')(x_mid)
                 x_mid = tf.keras.layers.Activation('sigmoid')(x_mid)
-                x_mid = tf.keras.layers.UpSampling2D(size=size, interpolation="bilinear")(x_mid)
+                upscale_factor = (np.int8(x_up.shape[1]/x_mid.shape[1]),np.int8(x_up.shape[2]/x_mid.shape[2]))
+                x_mid = tf.keras.layers.UpSampling2D(size=upscale_factor, interpolation="bilinear")(x_mid)
                 #x_mid = tf.image.resize_images(x_mid,size=tf.keras.backend.int_shape(inputs)[1:3])
 
                 # skip conn
@@ -419,7 +421,8 @@ class CarNet:
 
                 # merge up and mid
                 x_up_mid_merged = tf.keras.layers.Multiply()([x_up, x_mid])
-                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=2, interpolation="bilinear")(x_up_mid_merged)
+                upscale_factor = (np.int8(x_lo.shape[1]/x_up_mid_merged.shape[1]),np.int8(x_lo.shape[2]/x_up_mid_merged.shape[2]))
+                x_up_mid_merged = tf.keras.layers.UpSampling2D(size=upscale_factor, interpolation="bilinear")(x_up_mid_merged)
                 x_up_mid_merged = tf.keras.layers.Conv2D(n_seg_class, (1, 1),
                                         padding='same')(x_up_mid_merged)
 
@@ -428,6 +431,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
+                    upscale_factor = (np.int8(input_shape[0]/x_final.shape[1]),np.int8(input_shape[1]/x_final.shape[2]))
                     drive_output = tf.keras.layers.UpSampling2D(size=8,interpolation="bilinear", name="drive_seg")(x_final)
 
                 if last_layer_name:
@@ -491,8 +495,8 @@ if __name__ == '__main__':
     """
 
     backbone = BACKBONE.MOBILENETV2
-    test_in_tensor = tf.keras.Input([224,224,3])
-    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=0.75)
+    test_in_tensor = tf.keras.Input([320,320,3])
+    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=0.5)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     #for layers in ret.yolo_decoder:
     #    layers.trainable = False
