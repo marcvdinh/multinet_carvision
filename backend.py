@@ -44,7 +44,7 @@ class YOLO(object):
         self.anchors = get_anchors(FLAGS['anchors_path'])
         self.input_shape = FLAGS['input_size']
         self.generate(FLAGS)
-        self.score= 0.2
+        self.score= 0.3
         self.nms = 0.5
 
     def generate(self, FLAGS):
@@ -70,7 +70,7 @@ class YOLO(object):
                                                 n_anchors=len(self.anchors)//3,
                                                 n_lane_embedding=num_lane,
                                                 n_drive_embedding=num_drive,
-                                                alpha=1.4)
+                                                alpha=0.75)
         
             model = multinet.build()
             model.load_weights(model_path)
@@ -138,7 +138,7 @@ class YOLO(object):
             #image.show()
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
         if draw:
-            font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
+            font = ImageFont.truetype(font='font/FreeMono.ttf',
                                       size=np.floor(3e-2 * image.size[1] +
                                                     0.5).astype('int32'))
             thickness = (image.size[1] + image.size[0]) // 300
@@ -234,9 +234,9 @@ def export_tflite_model(yolo, path, test_dataset_path, quant=True):
         return img
     if quant:
         list_ds = tf.data.Dataset.list_files(test_dataset_path)
-        quant_ds = list_ds.shuffle(len(list_ds)).map(lambda x: open_image(x)).batch(1).prefetch(1)
+        quant_ds = list_ds.shuffle(2000).map(lambda x: open_image(x)).batch(1).prefetch(1)
         def representative_data_gen():
-            for input_value in quant_ds.take(100):
+            for input_value in quant_ds.take(1000):
                 yield [input_value]
         
    
@@ -328,7 +328,7 @@ def detect_video(yolo: YOLO, video_path: str, output_path: str = ""):
     prev_time = timer()
     detected = False
     trackers = []
-    font = ImageFont.truetype(font='font/FiraMono-Medium.otf', size=30)
+    font = ImageFont.truetype(font='font/FreeMono.ttf', size=30)
     thickness = 1
     frame_count = 0
     while True:

@@ -34,7 +34,7 @@ flags.DEFINE_string('weights', default='', help="weights path to resume training
 flags.DEFINE_string('input', default='/home/mdinh/Videos/test.mp4', help="Input data for various mode")
 flags.DEFINE_string('output', default='', help="Output paht for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(224, 224),
+                           default=(320, 320),
                            lower_bound=0,
                            help="Input size")
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
