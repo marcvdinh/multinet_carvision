@@ -128,7 +128,7 @@ def train(FLAGS):
                                                 n_anchors=len(anchors)//3,
                                                 n_lane_embedding=num_lane,
                                                 n_drive_embedding=num_drive,
-                                                alpha=1.4)
+                                                alpha=0.5)
         
         model = multinet.build()
         if weights_path:

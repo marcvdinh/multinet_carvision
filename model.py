@@ -350,7 +350,7 @@ class CarNet:
     def build_lane_detection(self, inputs,residual, n_seg_class=None, alpha=1.0, upsample_output=True, last_layer_name=None):       
             if n_seg_class is None:
                 n_seg_class=self.n_lane_embedding
-            inputs = tf.keras.layers.Conv2D(256, (3,3), padding="same", dilation_rate=2)(inputs)
+            inputs = tf.keras.layers.Conv2D(128, (3,3), padding="same", dilation_rate=2)(inputs)
             with tf.name_scope("lane_seg"):  
             # 1x1 conv
                 x_up = tf.keras.layers.Conv2D(128, (1, 1), padding='same',
@@ -395,7 +395,7 @@ class CarNet:
                 n_seg_class = self.n_drive_embedding  
             feat = tf.keras.Input(input_shape)
             res = tf.keras.Input(res_shape)
-            inputs = tf.keras.layers.Conv2D(256, (3,3), padding="same", dilation_rate=2)(feat)
+            inputs = tf.keras.layers.Conv2D(128, (3,3), padding="same", dilation_rate=2)(feat)
             
             with tf.name_scope("drive_seg"): 
             # 1x1 conv
@@ -490,9 +490,9 @@ if __name__ == '__main__':
     test code
     """
 
-    backbone = BACKBONE.PELEE
+    backbone = BACKBONE.MOBILENETV2
     test_in_tensor = tf.keras.Input([224,224,3])
-    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=1.4)
+    model = CarNet(inputs=None,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=0.75)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     #for layers in ret.yolo_decoder:
     #    layers.trainable = False

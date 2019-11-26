@@ -21,20 +21,20 @@ flags.DEFINE_enum_class(
     "Select network backbone, One of {'MOBILENETV2','DARKNET53','EFFICIENTNET'}"
 )
 flags.DEFINE_integer('batch_size',
-                     default=8,
+                     default=32,
                      lower_bound=0,
                      help="Train batch size")
 flags.DEFINE_string('config', default=None, help="Config path")
 flags.DEFINE_multi_integer('epochs',
-                           default=[15, 100],
+                           default=[10, 120],
                            lower_bound=0,
                            help="Frozen train epochs and Full train epochs")
-flags.DEFINE_string('export', default='export_model/saved_model', help="Export path")
-flags.DEFINE_string('weights', default='weights/mobilenetv2_trained_weights_stage_2.h5', help="weights path")
-flags.DEFINE_string('input', default='/home/marcdinh/Videos/commaai/test.mp4', help="Input data for various mode")
+flags.DEFINE_string('export', default='/home/mdinh/multinet_carvision/export_model/224-small/TRT', help="Export path")
+flags.DEFINE_string('weights', default='', help="weights path to resume training")
+flags.DEFINE_string('input', default='/home/mdinh/Videos/test.mp4', help="Input data for various mode")
 flags.DEFINE_string('output', default='', help="Output paht for various mode")
 flags.DEFINE_multi_integer('input_size',
-                           default=(416, 416),
+                           default=(224, 224),
                            lower_bound=0,
                            help="Input size")
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
@@ -44,7 +44,7 @@ flags.DEFINE_string(
     help="Model path")
 flags.DEFINE_enum_class(
     'mode',
-    default=MODE.SERVING,
+    default=MODE.TRAIN,
     enum_class=MODE,
     help=
     "Select exec mode, One of {'TRAIN','TRAIN_BACKBONE','IMAGE','VIDEO','TFLITE','SERVING','MAP','PRUNE','TRT'}"
@@ -58,7 +58,7 @@ flags.DEFINE_string('val_dataset',
                     default='data/val/*.tfrecords',
                     help="Dataset glob for validate")
 flags.DEFINE_string('test_dataset',
-                    default='data/train/*.tfrecords',
+                    default='/home/mdinh/Documents/test/*.jpg',
                     help="Dataset glob for test")
 flags.DEFINE_string('anchors_path',
                     default='config/yolo_anchors.txt',
@@ -158,7 +158,7 @@ def main(_):
         export_serving_model(YOLO(flags_dict), FLAGS.export)
     elif FLAGS.mode == MODE.TFLITE:
         log('Export hdf5 model to tflite model')
-        export_tflite_model(YOLO(flags_dict), FLAGS.export)
+        export_tflite_model(YOLO(flags_dict), FLAGS.export, FLAGS.test_dataset)
     elif FLAGS.mode == MODE.TRT:
         log('Export hdf5 model to tf-trt model')
         export_trt_model(YOLO(flags_dict), FLAGS.export)
