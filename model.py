@@ -432,7 +432,7 @@ class CarNet:
                 # TODO:
                 if upsample_output:
                     upscale_factor = (np.int8(input_shape[0]/x_final.shape[1]),np.int8(input_shape[1]/x_final.shape[2]))
-                    drive_output = tf.keras.layers.UpSampling2D(size=8,interpolation="bilinear", name="drive_seg")(x_final)
+                    drive_output = tf.keras.layers.UpSampling2D(size=upscale_factor,interpolation="bilinear", name="drive_seg")(x_final)
 
                 if last_layer_name:
                     x_final = self._identity(x_final, name=last_layer_name)
