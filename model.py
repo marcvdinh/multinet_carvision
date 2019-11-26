@@ -286,8 +286,8 @@ class CarNet:
 
 #####################PELEENET############################################
     def make_last_layers_pelee(self, Input, num_filters, out_filters):
-        x= ResBlock(Input,num_filters)
-
+        #x= ResBlock(Input,num_filters)
+        x = DenseLayer(Input, 5, num_filters,2)
         y = DenseLayer(x,1,32,2)
         y = Conv2D(out_filters,1)(y)
         #y = tf.keras.layers.AveragePooling2D(strides=2)(y)
