@@ -431,7 +431,7 @@ class CarNet:
                 x_final = tf.keras.layers.Activation('sigmoid')(x_final)
                 # TODO:
                 if upsample_output:
-                    upscale_factor = (np.int8(input_shape[0]/x_final.shape[1]),np.int8(input_shape[1]/x_final.shape[2]))
+                    upscale_factor = (np.int8(self.inputs.shape[1]/x_final.shape[1]),np.int8(self.inputs.shape[2]/x_final.shape[2]))
                     drive_output = tf.keras.layers.UpSampling2D(size=upscale_factor,interpolation="bilinear", name="drive_seg")(x_final)
 
                 if last_layer_name:
