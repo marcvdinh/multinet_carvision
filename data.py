@@ -69,7 +69,7 @@ class Dataset(tf.keras.callbacks.Callback):
         y2.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
         y3.set_shape([None, None, len(self.anchors)//3, self.num_classes + 5])
 
-        return image, (drive_label, y1, y2, y3)
+        return image, ( y1, y2, y3, drive_label, lane_label)
 
     def _dataset_internal(self,files,dataset_builder,parser):
         dataset = tf.data.Dataset.list_files(files)
@@ -146,6 +146,45 @@ class Dataset(tf.keras.callbacks.Callback):
             elif len(txts)>0:
                 return txts_dataset, num
 
+
+class LaneDataset():
+
+    def __init__(self, src_dir,  batch_size,
+                                 anchors,
+                                  num_lane,
+                                  num_drive,
+                                  num_classes,
+                                  input_shape, dummy_data):
+        self.batch_size = batch_size
+        self.input_size = input_shape
+        self.src_dir = src_dir
+        self.anchors = anchors
+        self.num_classes = num_classes
+        for input, label in dummy_data:
+            self.y1 = label[0]
+            self.y2 = label[1]
+            self.y3 = label[2]
+            self.freespace = label[3]
+
+    def generate_sample(self, path):
+        img = tf.io.read_file(path)
+        img = tf.io.decode_png(img, channels=3)
+        img = tf.image.resize(img, self.input_size)
+        img = tf.cast(img, tf.float32)/ 255.
+        mask_path= tf.strings.regex_replace(path, "gt_image", "gt_binary_image")
+        mask = tf.io.read_file(mask_path)
+        mask = tf.io.decode_png(mask, channels=1)
+        mask = mask / 255
+        mask = tf.image.resize(mask, self.input_size)
+        
+        return img,  (self.y1[0], self.y2[0], self.y3[0], self.freespace[0], mask)
+    
+    def build(self):
+        list_ds = tf.data.Dataset.list_files(self.src_dir)
+        num = tf.data.experimental.cardinality(list_ds)
+        #print(self.y1)
+        ds = list_ds.shuffle(2000).map(lambda x: self.generate_sample(x)).batch(self.batch_size).prefetch(1)
+        return ds, num
 
 if __name__ == '__main__':
     """

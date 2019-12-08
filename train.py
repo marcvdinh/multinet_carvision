@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
 import zipfile
-from data import Dataset
+from data import Dataset, LaneDataset
 from tools.modes import OPT, BACKBONE, DATASET_MODE
 from tools.callbacks import MAPCallback, TensorBoardImage
 from tools.utils import get_anchors, get_classes, ModelFactory
@@ -53,14 +53,14 @@ def train(FLAGS):
     strategy = tf.distribute.MirroredStrategy()
     batch_size = batch_size * strategy.num_replicas_in_sync
     #print([train_dataset_glob,batch_size, anchors, num_classes, input_shape])
-    train_dataset_callback = Dataset(train_dataset_glob,
+    train_dataset_builder = Dataset(train_dataset_glob,
                                      batch_size,
                                      anchors,
                                      num_lane,
                                      num_drive,
                                      num_classes,
                                      input_shape)
-    train_dataset, train_num = train_dataset_callback.build()
+    train_dataset, train_num = train_dataset_builder.build()
     val_dataset_builder = Dataset(val_dataset_glob,
                                   batch_size,
                                   anchors,
@@ -70,6 +70,8 @@ def train(FLAGS):
                                   input_shape,
                                   mode=DATASET_MODE.VALIDATE)
     val_dataset, val_num = val_dataset_builder.build()
+
+    dummy_data = val_dataset.take(1)
     #map_callback = MAPCallback(test_dataset_glob,
     #                           input_shape,
     #                           anchors,
@@ -105,8 +107,8 @@ def train(FLAGS):
         
     #lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
     #drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
-    drive_loss = 'sparse_categorical_crossentropy'
-    losses = [drive_loss, yolo_loss_1,  yolo_loss_2,  yolo_loss_3]
+    drive_loss = lane_loss = 'sparse_categorical_crossentropy'
+    losses = [yolo_loss_1,  yolo_loss_2,  yolo_loss_3, drive_loss, lane_loss]
 
         #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}
     #else:
@@ -225,22 +227,43 @@ def train(FLAGS):
                 str(backbone).split('.')[1].lower() +
                 '_trained_weights_stage_2.h5'))
 
-    if False:
-        for i in range(50, len(model.layers)):
-            model.layers[i].trainable = True
+    if True:
+        del train_dataset_builder
+        del val_dataset_builder
+        del train_dataset
+        del val_dataset
+        
+        train_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/train/gt_image/*.png",
+                                  batch_size,
+                                  anchors,
+                                  num_lane,
+                                  num_drive,
+                                  num_classes,
+                                  input_shape , dummy_data)
+        train_dataset, train_num = train_dataset_builder.build()
+        val_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/val/gt_image/*.png",
+                                  batch_size,
+                                  anchors,
+                                  num_lane,
+                                  num_drive,
+                                  num_classes,
+                                  input_shape, dummy_data)
+        val_dataset, val_num = val_dataset_builder.build()
+        for layer in model.layers[:-1]:
+            layer.trainable = False
         with strategy.scope():
             model.compile(optimizer=tf.keras.optimizers.Adam(exp_lr,epsilon=1e-8),
                                loss=losses)  # recompile to apply the change
         print('finetune at layer 50.')
         model.fit(train_dataset,
-                           epochs=train_step + freeze_step,
-                           initial_epoch= freeze_step,
-                           steps_per_epoch=max(1, train_num // batch_size),
+                           epochs= train_step + 2 * freeze_step,
+                           initial_epoch= freeze_step + train_step,
+                           steps_per_epoch=max(1, train_num.numpy() // batch_size),
                            callbacks=[
-                               checkpoint, cos_lr, early_stopping, image_viewer #TODO fix logging and mapcallback
+                               checkpoint, early_stopping #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
-                           validation_steps=max(1, val_num // batch_size))
+                           validation_steps=max(1, val_num.numpy() // batch_size))
         model.save_weights(
             os.path.join(
                 log_dir,
