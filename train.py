@@ -44,7 +44,7 @@ def train(FLAGS):
     class_names = get_classes(FLAGS['classes_path'])
     num_classes = len(class_names)
     num_lane = 2
-    num_drive = 3
+    num_drive = 2
     anchors = get_anchors(FLAGS['anchors_path'])
     input_shape = FLAGS['input_size']  # multiple of 32, hw
     model_path = FLAGS['model']
@@ -105,9 +105,9 @@ def train(FLAGS):
     yolo_loss_2 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 1, anchors, print_loss=False)
     yolo_loss_3 = lambda y_true, yolo_output: YoloLoss(y_true, yolo_output, 2, anchors, print_loss=False)
         
-    #lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
+    lane_loss = lambda y_true, lane_output: laneSegLoss(lane_output, y_true)
     #drive_loss = lambda y_true, drive_output: driveSegLoss(drive_output, y_true)
-    drive_loss = lane_loss = 'sparse_categorical_crossentropy'
+    drive_loss = 'sparse_categorical_crossentropy'
     losses = [yolo_loss_1,  yolo_loss_2,  yolo_loss_3, drive_loss, lane_loss]
 
         #losses={'lane_seg':'lane_loss', 'drive_seg':'drive_loss', 'y1':'yolo_loss','y2':'yolo_loss','y3':'yolo_loss'}
@@ -233,7 +233,7 @@ def train(FLAGS):
         del train_dataset
         del val_dataset
         
-        train_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/train/gt_image/*.png",
+        train_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/training/gt_image/*.png",
                                   batch_size,
                                   anchors,
                                   num_lane,
@@ -241,7 +241,7 @@ def train(FLAGS):
                                   num_classes,
                                   input_shape , dummy_data)
         train_dataset, train_num = train_dataset_builder.build()
-        val_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/val/gt_image/*.png",
+        val_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/testing/gt_image/*.png",
                                   batch_size,
                                   anchors,
                                   num_lane,

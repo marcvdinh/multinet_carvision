@@ -33,11 +33,13 @@ class Dataset(tf.keras.callbacks.Callback):
                                       channels=3,
                                       dtype=tf.float32)
         image.set_shape([None, None, 3])
-        lane =tf.io.decode_image(features['image/lane'],
+        lane = expand_seg_label(tf.io.decode_image(features['image/lane'],
                                       channels=1,
                                       dtype=tf.uint8
-                                      )
-        lane.set_shape([None, None, 1])
+                                      ),
+                                      2,
+                                      "lane")
+        lane.set_shape([None, None, 2])
         
         drive = tf.io.decode_image(features['image/drive'],
                                       channels=1,

@@ -337,11 +337,11 @@ def expand_seg_label(label, Ncl, label_type):
                      tf.int32), tf.cast(tf.shape(label)[0], tf.int32)
     label = tf.tile( label, [1, 1, Ncl])
     if label_type == "lane":
-        lane_classes = tf.broadcast_to( tf.constant([0,255], dtype=tf.uint8, name="lane_levels"), [h,w,Ncl])
+        lane_classes = tf.broadcast_to( tf.constant([0,1], dtype=tf.uint8, name="lane_levels"), [h,w,Ncl])
         #tf.print(tf.shape(lane_classes))
         masks = tf.cast(tf.equal(label, lane_classes), tf.float32)
     else:
-        drive_classes = tf.broadcast_to(tf.constant([0,1,2], dtype=tf.uint8, name="drive_levels"), [h, w, Ncl])
+        drive_classes = tf.broadcast_to(tf.constant([0,1], dtype=tf.uint8, name="drive_levels"), [h, w, Ncl])
         #tf.print(tf.shape(drive_classes))
         masks = tf.cast(tf.equal(label, drive_classes), tf.float32)
     #tf.print(masks)
