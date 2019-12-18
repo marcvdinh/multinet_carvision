@@ -7,7 +7,7 @@ from typing import List, Tuple
 from tools.utils import compose
 from encoder_zoo.override import mobilenet_v2
 from encoder_zoo.efficientnet import EfficientNetB4, MBConvBlock, get_model_params, BlockArgs, EfficientConv2DKernelInitializer
-from encoder_zoo.pelee import PeleeNet, ResBlock, DenseLayer, Conv2D
+from encoder_zoo.pelee import PeleeNet, ResBlock, DenseLayer, Conv2D, StemBlock
 from tools.modes import OPT, BACKBONE
 class CarNet:
     def __init__(self,backbone,inputs=tf.keras.layers.Input(shape=(None, None, 3)),weights_path=None, n_class=11,n_anchors=None, n_lane_embedding=None, n_drive_embedding=None, alpha=1.0):
@@ -132,8 +132,10 @@ class CarNet:
         res5 = tf.keras.Input(resmid_shape)
         res12 = tf.keras.Input(resfin_shape)
 
-        x, y1 = self.make_last_layers_mobilenet(feat, 17, 512,
-                                        num_anchors * (num_classes + 5))
+        #x, y1 = self.make_last_layers_mobilenet(feat, 17, 512,
+        #                                num_anchors * (num_classes + 5))
+
+        x, y1 = self.make_last_layers_pelee(feat,512,num_anchors * (num_classes + 5))
         x = compose(
             tf.keras.layers.Conv2D(256,
                                 kernel_size=1,
@@ -149,8 +151,9 @@ class CarNet:
                 (1, 1), alpha,
                 384)(res12) #block12
         ])
-        x, y2 = self.make_last_layers_mobilenet(x, 21, 256,
-                                        num_anchors * (num_classes + 5))
+        #x, y2 = self.make_last_layers_mobilenet(x, 21, 256,
+        #                                num_anchors * (num_classes + 5))
+        x, y2 = self.make_last_layers_pelee(x,256,num_anchors * (num_classes + 5))
         x = compose(
             tf.keras.layers.Conv2D(128,
                                 kernel_size=1,
@@ -165,8 +168,9 @@ class CarNet:
             self.MobilenetConv2D((1, 1), alpha,
                             128)(res5) #block5
         ])
-        x, y3 = self.make_last_layers_mobilenet(x, 25, 128,
-                                        num_anchors * (num_classes + 5))
+        #x, y3 = self.make_last_layers_mobilenet(x, 25, 128,
+        #                                num_anchors * (num_classes + 5))
+        x, y3 = self.make_last_layers_pelee(x,128,num_anchors * (num_classes + 5))
         y1 = tf.keras.layers.Reshape(
             (y1.shape[1], y1.shape[2], num_anchors, num_classes + 5), name='y1')(y1)
         y2 = tf.keras.layers.Reshape(
@@ -287,11 +291,13 @@ class CarNet:
 
 #####################PELEENET############################################
     def make_last_layers_pelee(self, Input, num_filters, out_filters):
-        #x= ResBlock(Input,num_filters)
-        x = DenseLayer(Input, 5, num_filters,2)
-        y = DenseLayer(x,1,32,2)
+        #x = StemBlock(Input)
+        x = DenseLayer(Input, 3, 32,4)
+        x = Conv2D(num_filters,1)(x)
+        #x = tf.keras.layers.AveragePooling2D(strides=2)(x)
+        y = ResBlock(x)
         y = Conv2D(out_filters,1)(y)
-        #y = tf.keras.layers.AveragePooling2D(strides=2)(y)
+       
 
         return x,y
 
@@ -500,13 +506,13 @@ if __name__ == '__main__':
 
     backbone = BACKBONE.MOBILENETV2
     test_in_tensor = tf.keras.Input([320,320,3])
-    model = CarNet(inputs=test_in_tensor,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=5, n_drive_embedding=3, alpha=0.5)
+    model = CarNet(inputs=test_in_tensor,backbone=backbone,n_class=11,n_anchors=7, n_lane_embedding=2, n_drive_embedding=2, alpha=0.75)
     ret = model.build(inputs=test_in_tensor, freeze_layers=155)
     #for layers in ret.yolo_decoder:
     #    layers.trainable = False
     #ret.layers[-1].trainable = False
     for layer in ret.layers[:]:
-        print(layer.trainable)
+        layer.trainable=True
     #tf.keras.utils.plot_model(
     #    ret,
     #    to_file='mobilenet_model.png',

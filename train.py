@@ -184,9 +184,11 @@ def train(FLAGS):
 
     if True:
         with strategy.scope():
+            model.layers[-1].trainable = False
             for i in range(len(model.layers)):
                 print(model.layers[i].trainable)
             print("training Phase 1")
+           
             model.compile(optimizer=tf.keras.optimizers.Adam(exp_lr,epsilon=1e-8),
                           loss=losses)
         model.fit(
@@ -197,6 +199,8 @@ def train(FLAGS):
             callbacks=[logging, checkpoint],
             validation_data=val_dataset,
             validation_steps=max(1, val_num // batch_size))
+        for layer in model.layers:
+            layer.trainable = True
         model.save_weights(
             os.path.join(
                 log_dir,
@@ -206,8 +210,9 @@ def train(FLAGS):
     # Train longer if the result is not good.
     if True:
         tf.compat.v1.keras.backend.clear_session()
-        for i in range(len(model.layers)):
-            model.layers[i].trainable = True
+        #for layer in model.layers[:-1]:
+        #    layer.trainable = True
+        model.layers[-1].trainable = False
         with strategy.scope():
             model.compile(optimizer=tf.keras.optimizers.SGD(lr[1],momentum=0.9),
                                loss=losses)  # recompile to apply the change
@@ -221,6 +226,8 @@ def train(FLAGS):
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num // batch_size))
+        for layer in model.layers:
+            layer.trainable = True
         model.save_weights(
             os.path.join(
                 log_dir,
@@ -251,19 +258,23 @@ def train(FLAGS):
         val_dataset, val_num = val_dataset_builder.build()
         for layer in model.layers[:-1]:
             layer.trainable = False
+        #model.layers[-1].trainable = True
         with strategy.scope():
             model.compile(optimizer=tf.keras.optimizers.Adam(exp_lr,epsilon=1e-8),
                                loss=losses)  # recompile to apply the change
-        print('finetune at layer 50.')
+        print('finetune on tusimple')
+        print(val_num.numpy())
         model.fit(train_dataset,
-                           epochs= train_step + 2 * freeze_step,
-                           initial_epoch= freeze_step + train_step,
-                           steps_per_epoch=max(1, train_num.numpy() // batch_size),
+                           epochs = train_step + 3 * freeze_step,
+                           initial_epoch = freeze_step + train_step,
+                           steps_per_epoch = max(1, train_num.numpy() // batch_size),
                            callbacks=[
                                checkpoint, early_stopping #TODO fix logging and mapcallback
                            ],
                            validation_data=val_dataset,
                            validation_steps=max(1, val_num.numpy() // batch_size))
+        for layer in model.layers:
+            layer.trainable = False
         model.save_weights(
             os.path.join(
                 log_dir,

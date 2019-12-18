@@ -54,19 +54,12 @@ def open_sharded_output_tfrecords(exit_stack, base_path, num_shards):
 
 
 def create_tf_example(src_dir,img):
-    xmins = [] # List of normalized left x coordinates in bounding box (1 per box)
-    xmaxs = [] # List of normalized right x coordinates in bounding box
-            # (1 per box)
-    ymins = [] # List of normalized top y coordinates in bounding box (1 per box)
-    ymaxs = [] # List of normalized bottom y coordinates in bounding box
-            # (1 per box)
-    classes_text = [] # List of string class name of bounding box (1 per box)
-    classes = [] # List of integer class id of bounding box (1 per box) 
+    
     check = False
     image_name = img['name'].split('.')[0]
-    image_path = ops.join(src_dir, 'images', "100k", "val")
+    image_path = ops.join(src_dir, 'training', "gt_image")
     image_path = ops.join(image_path, img['name'])
-    assert ops.exists(image_path), '{:s} not exist'.format(image_path)
+    
     drive_name = image_name + "_drivable_id.png"
     drive_path = ops.join(src_dir,'drivable_maps', "labels", "val")
     drive_path = ops.join(drive_path, drive_name)
@@ -81,170 +74,15 @@ def create_tf_example(src_dir,img):
     
     encoded_image_data = tf.io.gfile.GFile(image_path, 'rb').read()
     image_shape = tf.image.decode_jpeg(encoded_image_data, channels=3).shape
-    lane_image = np.zeros([image_shape[0], image_shape[1]], np.uint8)
-    lane_path = ops.join(src_dir, "bdd100k_lanes", image_name +'.png')
-    for _, lane in enumerate(lanes):
-
-        if lane['attributes']['laneDirection'] == 'parallel':
-            
-            handle_pts = lane['poly2d'][0]['vertices']
-            handle_pts = np.transpose(handle_pts)
-            handle_pts = handle_pts.astype(float)
-            nodes = np.asfortranarray(handle_pts)
-            curve = bezier.Curve.from_nodes(nodes)
-            s_vals = np.linspace(0.0, 1.0, 15)
-            lane_pts = curve.evaluate_multi(s_vals)
-            lane_pts = np.transpose(lane_pts)  
-            #binary lane map
-            cv2.polylines(lane_image, np.int32([lane_pts]), isClosed=False,
-                              color=255, thickness=10)        
-            #if lane['attributes']['laneType'] == 'single white':
-            #    check = True
-            #    cv2.polylines(lane_image, np.int32([lane_pts]), isClosed=False,
-            #                  color=120, thickness=10)
-            #if lane['attributes']['laneType'] == 'double white':
-            #    check = True
-            #    cv2.polylines(lane_image, np.int32([lane_pts]), isClosed=False,
-            #                  color=170, thickness=10)
-            #if lane['attributes']['laneType'] == 'single yellow':
-            #    check = True
-            #    cv2.polylines(lane_image, np.int32([lane_pts]), isClosed=False,
-            #                  color=220, thickness=10)
-            #if lane['attributes']['laneType'] == 'double yellow':
-            #    check = True
-            #    cv2.polylines(lane_image, np.int32([lane_pts]), isClosed=False,
-            #                  color=255, thickness=10)
-            #else: check = False
     
-    
-    filename = img['name'].encode('utf-8') # Filename of the image. Empty if image is not from file
-    #image_format = b"jpg"
-    
-    traffic_signs = [label for label in labels if label['category'] == 'traffic sign']
-    traffic_lights = [label for label in labels if label['category'] == 'traffic light']
-    cars = [label for label in labels if label['category'] == 'car']
-    riders = [label for label in labels if label['category'] == 'rider']
-    motors = [label for label in labels if label['category'] == 'motor']
-    bikes = [label for label in labels if label['category'] == 'bike']
-    buses = [label for label in labels if label['category'] == 'bus']
-    trucks = [label for label in labels if label['category'] == 'truck']
-    persons = [label for label in labels if label['category'] == 'person']
- 
-
-    for _, traffic_sign in enumerate(traffic_signs):
-        xmins.append(float(traffic_sign["box2d"]["x1"]))
-        xmaxs.append(float(traffic_sign["box2d"]["x2"]))
-
-        ymins.append(float(traffic_sign["box2d"]["y1"]))
-        ymaxs.append(float(traffic_sign["box2d"]["y2"]))
-
-        classes_text.append(b"traffic sign")
-        classes.append(0)
-        
-    for _, car in enumerate(cars):
-        xmins.append(car["box2d"]["x1"])
-        xmaxs.append(car["box2d"]["x2"])
-
-        ymins.append(car["box2d"]["y1"])
-        ymaxs.append(car["box2d"]["y2"])
-
-        classes_text.append(b"car")
-        classes.append(5)
-        
-    for _, rider in enumerate(riders):
-        xmins.append(rider["box2d"]["x1"])
-        xmaxs.append(rider["box2d"]["x2"])
-
-        ymins.append(rider["box2d"]["y1"])
-        ymaxs.append(rider["box2d"]["y2"])
-
-        classes_text.append(b"rider")
-        classes.append(6)
-
-    for _, motor in enumerate(motors):
-        xmins.append(motor["box2d"]["x1"])
-        xmaxs.append(motor["box2d"]["x2"])
-
-        ymins.append(motor["box2d"]["y1"])
-        ymaxs.append(motor["box2d"]["y2"])
-
-        classes_text.append(b"motor")
-        classes.append(7)
-
-    for _, bike in enumerate(bikes):
-        xmins.append(bike["box2d"]["x1"])
-        xmaxs.append(bike["box2d"]["x2"])
-
-        ymins.append(bike["box2d"]["y1"])
-        ymaxs.append(bike["box2d"]["y2"])
-
-        classes_text.append(b"bike")
-        classes.append(8)
-
-    for _, bus in enumerate(buses):
-        xmins.append(bus["box2d"]["x1"])
-        xmaxs.append(bus["box2d"]["x2"])
-
-        ymins.append(bus["box2d"]["y1"])
-        ymaxs.append(bus["box2d"]["y2"])
-
-        classes_text.append(b"bus")
-        classes.append(9)
-        
-    for _, truck in enumerate(trucks):
-        xmins.append(truck["box2d"]["x1"])
-        xmaxs.append(truck["box2d"]["x2"])
-
-        ymins.append(truck["box2d"]["y1"])
-        ymaxs.append(truck["box2d"]["y2"])
-
-        classes_text.append(b"truck")
-        classes.append(10)
-        
-    for _, person in enumerate(persons):
-        xmins.append(person["box2d"]["x1"])
-        xmaxs.append(person["box2d"]["x2"])
-
-        ymins.append(person["box2d"]["y1"])
-        ymaxs.append(person["box2d"]["y2"])
-
-        classes_text.append(b"person")
-        classes.append(11)
-        
-    for _, traffic_light in enumerate(traffic_lights):
-        xmins.append(traffic_light["box2d"]["x1"])
-        xmaxs.append(traffic_light["box2d"]["x2"])
-
-        ymins.append(traffic_light["box2d"]["y1"])
-        ymaxs.append(traffic_light["box2d"]["y2"])
-
-        if traffic_light["attributes"]["trafficLightColor"] == "red":
-            classes_text.append(b"traffic lig: red")
-            classes.append(1)
-        if traffic_light["attributes"]["trafficLightColor"] == "yellow":
-            classes_text.append(b"traffic lig: yellow")
-            classes.append(2)  
-        if traffic_light["attributes"]["trafficLightColor"] == "green":
-            classes_text.append(b"traffic lig: green")
-            classes.append(3)
-        if traffic_light["attributes"]["trafficLightColor"] == "none":
-            classes_text.append(b"traffic lig: none")
-            classes.append(4)  
     #write tfrecord
     if 1:
         cv2.imwrite(lane_path, lane_image)
         encoded_lane_label = tf.io.gfile.GFile(lane_path, 'rb').read()
         tf_example = tf.train.Example(features=tf.train.Features(feature={
-        'image/filename': _bytes_feature(filename),
-        
+        'image/filename': _bytes_feature(filename), 
         'image/encoded': _bytes_feature(encoded_image_data),
         'image/lane': _bytes_feature(encoded_lane_label),
-        'image/drive': _bytes_feature(encoded_drive_label),
-        'image/object/bbox/xmin': _float_feature(xmins),
-        'image/object/bbox/xmax': _float_feature(xmaxs),
-        'image/object/bbox/ymin':_float_feature(ymins),
-        'image/object/bbox/ymax': _float_feature(ymaxs),
-        'image/object/bbox/label': _int64_feature(classes),
     }))
     else: tf_example=[]
 

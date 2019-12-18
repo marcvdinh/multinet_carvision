@@ -40,7 +40,7 @@ flags.DEFINE_multi_integer('input_size',
 flags.DEFINE_string('log_directory', default="tboard", help="Log directory")
 flags.DEFINE_string(
     'model',    
-    default='/home/mdinh/multinet_carvision/tboard/mobilenetv2_trained_weights_stage_2.h5',#'/media/marcdinh/PORPOISE/tboard/mobilenetv2_trained_weights_stage_2.h5',
+    default='/home/mdinh/multinet_carvision/tboard/mobilenetv2_trained_weights_stage_1.h5',#'/media/marcdinh/PORPOISE/tboard/mobilenetv2_trained_weights_stage_2.h5',
     help="Model path")
 flags.DEFINE_enum_class(
     'mode',
@@ -67,7 +67,7 @@ flags.DEFINE_string('classes_path',
                     default='config/bdd100k_classes.txt',
                     help="Classes Path")
 flags.DEFINE_multi_float('learning_rate',
-                         default=[1e-3, 5e-4],
+                         default=[0.25, 5e-3],
                          lower_bound=0,
                          help="Learning rate")
 flags.DEFINE_enum_class(

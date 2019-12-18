@@ -169,8 +169,12 @@ class LaneDataset():
             self.freespace = label[3]
 
     def generate_sample(self, path):
+
         img = tf.io.read_file(path)
         img = tf.io.decode_png(img, channels=3)
+        img = tf.cond( tf.less(
+                    tf.random.uniform([]),
+                    0.5), lambda: tf.image.adjust_gamma(img, 0.4), lambda: img)
         img = tf.image.resize(img, self.input_size)
         img = tf.cast(img, tf.float32)/ 255.
         mask_path= tf.strings.regex_replace(path, "gt_image", "gt_binary_image")
@@ -185,7 +189,7 @@ class LaneDataset():
         list_ds = tf.data.Dataset.list_files(self.src_dir)
         num = tf.data.experimental.cardinality(list_ds)
         #print(self.y1)
-        ds = list_ds.shuffle(2000).map(lambda x: self.generate_sample(x)).batch(self.batch_size).prefetch(1)
+        ds = list_ds.shuffle(2000).map(lambda x: self.generate_sample(x)).repeat().batch(self.batch_size).prefetch(1)
         return ds, num
 
 if __name__ == '__main__':
@@ -193,6 +197,11 @@ if __name__ == '__main__':
     test code
     """
     anchors = get_anchors('config/yolo_anchors.txt')
+    num_lane =2
+    num_drive =2
+    num_classes =12
+    input_shape = [224,224]
+    batch_size = 8
     #print(anchors)
     #[[ 10.,  13.],
     #   [ 16.,  30.],
@@ -203,32 +212,25 @@ if __name__ == '__main__':
     #   [116.,  90.],
     #   [156., 198.],
     #   [373., 326.]]
-    dataset_callback = Dataset("data/train/*.tfrecords",
-                                     8,
-                                     anchors,
-                                     11,
-                                     [224,224],
-                                     mode=DATASET_MODE.TEST)
+    val_dataset_builder = Dataset('data/val/*.tfrecords',
+                                  batch_size,
+                                  anchors,
+                                  num_lane,
+                                  num_drive,
+                                  num_classes,
+                                  input_shape,
+                                  mode=DATASET_MODE.VALIDATE)
+    val_dataset, val_num = val_dataset_builder.build()
 
-   
-    with tf.Session() as sess:
-        dataset, num = dataset_callback.build()
-
-
-        for n,image_features in dataset.enumerate():
-            gt_image = sess.run(image_features[0].eval())
-            gt_lane = sess.run(image_features[1].eval())
-            gt_drive = sess.run(image_features[2].eval())
-        
-            print(gt_lane.shape)
-            #gt_image = image_features[0].numpy()
-            #gt_lane = image_features[1].numpy()
-            #gt_drive = image_features[2].numpy()
-            fig = plt.figure()
-            fig.add_subplot(1,3,1)
-            plt.imshow(gt_image)
-            fig.add_subplot(1,3,2)
-            plt.imshow(gt_lane)
-            fig.add_subplot(1,3,3)
-            plt.imshow(gt_drive)
-            plt.show()
+    dummy_data = val_dataset.take(1)
+    del val_dataset
+    del val_num
+    val_dataset_builder = LaneDataset( "/home/mdinh/Pictures/tusimple/testing/gt_image/*.png",
+                                  batch_size,
+                                  anchors,
+                                  num_lane,
+                                  num_drive,
+                                  num_classes,
+                                  input_shape, dummy_data)
+    val_dataset, val_num = val_dataset_builder.build()
+    print(val_num,val_dataset.take(1))
