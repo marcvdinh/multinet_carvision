@@ -3,13 +3,15 @@ import collections
 import math
 import numpy as np
 import tensorflow as tf
-from tools.utils import compose
+import sys
+sys.path.append("/home/mdinh/multinet_carvision/tools")
+import utils
 
 
 HEADLESS = "/home/marcdinh/multinet_carvision/weights/pelee_headless_weights.h5"
 LAST_LAYER = "/home/marcdinh/multinet_carvision/weights/pelee_weights.h5"
 def Conv2D( ch, kernel, strides=1):
-    return compose(
+    return utils.compose(
             tf.keras.layers.Conv2D(ch,
                                 kernel,
                                 padding='same',
@@ -30,27 +32,30 @@ def StemBlock(Input):
     return final
 
 def DenseLayer(Input, num_layers, growth_rate, bottleneck_width):
+    x = Input
+    num_input_features = x.shape[-1]
     growth_rate = growth_rate // 2
+    inter_channel = int(growth_rate*bottleneck_width/4) * 4
+    if inter_channel > num_input_features / 2:
+            inter_channel = int(num_input_features / 8) * 4
     for i in range(num_layers):
-        inter_channel = int(growth_rate*bottleneck_width/4) * 4
-        left = Conv2D(inter_channel, 1)(Input)
+        left = Conv2D(inter_channel, 1)(x)
         left = Conv2D(growth_rate, 3)(left)
 
-        right = Conv2D(inter_channel, 1)(Input)
+        right = Conv2D(inter_channel, 1)(x)
         right = Conv2D(growth_rate, 3)(right)
         right = Conv2D(growth_rate, 3)(right)
 
-        merge = tf.keras.layers.concatenate([left, right, Input])
+        x = tf.keras.layers.concatenate([x, left, right])
+    return  x
 
-    return  merge
-
-def ResBlock(Input, out_filter):
+def ResBlock(Input):
     
-    left = Conv2D(out_filter//4,1,1)(Input)
-    left = Conv2D(out_filter//2,3,1)(left)
-    left = Conv2D(out_filter//2,1,1)(left)
+    left = Conv2D(128,1,1)(Input)
+    left = Conv2D(128,3,1)(left)
+    left = Conv2D(256,1,1)(left)
 
-    right = Conv2D(out_filter//2,1,1)(Input)
+    right = Conv2D(256,1,1)(Input)
 
     added = tf.keras.layers.add([left,right])
 
@@ -103,5 +108,5 @@ if __name__ == '__main__':
     """
     #backbone = BACKBONE.MOBILENETV2
     #test_in_tensor = tf.keras.backend.placeholder(dtype=tf.float32, shape=(1, 224, 224, 3), name='input')
-    model = PeleeNet(tf.keras.Input([224,224,3]), last_layer=False)
+    model = PeleeNet(tf.keras.Input([224,224,3]), last_layer=False, weights=False)
     model.summary()
